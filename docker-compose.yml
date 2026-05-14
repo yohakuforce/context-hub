@@ -2,10 +2,14 @@ version: "3.9"
 
 # Context-Hub Docker Compose
 # Windows (Docker Desktop / WSL2) and macOS compatible.
+#
 # Usage:
 #   1. Copy .env.example to .env and fill in values
 #   2. docker compose up -d
 #   3. docker compose logs -f app
+#
+# LLM_PROVIDER options: claude-code | codex | ollama | mock
+# EMBEDDING_PROVIDER:   bge-m3 | mock
 
 services:
   db:
@@ -37,6 +41,9 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:${DB_PASSWORD}@db:5432/context_hub
+      LLM_PROVIDER: ${LLM_PROVIDER:-claude-code}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-bge-m3}
+      EMBEDDING_DEVICE: ${EMBEDDING_DEVICE:-cpu}
     depends_on:
       db:
         condition: service_healthy
@@ -44,6 +51,8 @@ services:
       # Meeting audio files storage (stays inside the social PC, never pushed)
       - meeting_data:/app/data/meetings
       - document_data:/app/data/documents
+      # BGE-M3 model cache — downloaded once, persisted across container restarts
+      - bge_m3_cache:/root/.cache/huggingface
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       interval: 30s
@@ -54,3 +63,4 @@ volumes:
   pg_data:
   meeting_data:
   document_data:
+  bge_m3_cache:

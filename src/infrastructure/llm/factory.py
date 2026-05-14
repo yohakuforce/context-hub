@@ -2,80 +2,115 @@
 
 Reads LLM_PROVIDER from the environment and returns the appropriate adapter.
 Business logic NEVER imports adapters directly — always goes through this factory.
+
+Supported providers (2026-05-15 policy: subscription AI only, zero pay-per-token):
+  claude-code  — ClaudeCodeAdapter  (Claude Code CLI subprocess)
+  codex        — CodexAdapter       (Codex CLI subprocess)
+  ollama       — OllamaAdapter      (local Ollama HTTP server)
+  mock         — MockLLMAdapter     (test / CI, no external calls)
+
+REMOVED providers (deprecated — see individual adapter files for migration guide):
+  claude  — was ClaudeAdapter (Anthropic API, pay-per-token)
+  openai  — was OpenAIAdapter (OpenAI API, pay-per-token)
 """
 
 from __future__ import annotations
 
 from src.infrastructure.llm.base import LLMAdapter
-from src.infrastructure.llm.mock_adapter import MockEmbeddingService, MockLLMAdapter
+from src.infrastructure.llm.mock_adapter import MockLLMAdapter
 
 
 def create_llm_adapter(
     provider: str,
+    claude_code_timeout: float | None = None,
+    codex_timeout: float | None = None,
+    ollama_base_url: str | None = None,
+    ollama_model: str | None = None,
+    # Legacy kwargs — accepted but raise informative errors
     anthropic_api_key: str | None = None,
     openai_api_key: str | None = None,
-    claude_model: str = "claude-3-5-sonnet-20241022",
+    claude_model: str | None = None,
 ) -> LLMAdapter:
     """Construct the appropriate LLM adapter based on the provider name.
 
     Args:
-        provider: One of "claude", "openai", "mock".
-        anthropic_api_key: Required when provider="claude".
-        openai_api_key: Required when provider="openai".
-        claude_model: Model to use for Claude (default: claude-3-5-sonnet).
+        provider: One of "claude-code", "codex", "ollama", "mock".
+        claude_code_timeout: Subprocess timeout in seconds for claude-code.
+        codex_timeout: Subprocess timeout in seconds for codex.
+        ollama_base_url: Override Ollama server URL (default: http://localhost:11434).
+        ollama_model: Override Ollama model name (default: llama3).
+        anthropic_api_key: DEPRECATED — raises ValueError if provider is "claude".
+        openai_api_key: DEPRECATED — raises ValueError if provider is "openai".
+        claude_model: DEPRECATED parameter, ignored.
 
     Returns:
         An LLMAdapter instance ready for use.
 
     Raises:
-        ValueError: If provider is unknown or required key is missing.
+        ValueError: If provider is unknown or a deprecated provider is requested.
     """
     if provider == "mock":
         return MockLLMAdapter()
 
-    if provider == "claude":
-        if not anthropic_api_key:
-            raise ValueError("ANTHROPIC_API_KEY is required for LLM_PROVIDER=claude")
-        # Lazy import to avoid loading anthropic SDK when not needed
-        from src.infrastructure.llm.claude_adapter import ClaudeAdapter
+    if provider == "claude-code":
+        from src.infrastructure.llm.claude_code_adapter import ClaudeCodeAdapter
+        return ClaudeCodeAdapter(timeout_seconds=claude_code_timeout)
 
-        return ClaudeAdapter(api_key=anthropic_api_key, model=claude_model)
+    if provider == "codex":
+        from src.infrastructure.llm.codex_adapter import CodexAdapter
+        return CodexAdapter(timeout_seconds=codex_timeout)
+
+    if provider == "ollama":
+        from src.infrastructure.llm.ollama_adapter import OllamaAdapter
+        return OllamaAdapter(base_url=ollama_base_url, model=ollama_model)
+
+    # Deprecated provider guard — give actionable error messages
+    if provider == "claude":
+        raise ValueError(
+            "LLM_PROVIDER='claude' is deprecated (Anthropic API is pay-per-token). "
+            "Use LLM_PROVIDER='claude-code' to call the Claude Code CLI instead."
+        )
 
     if provider == "openai":
-        if not openai_api_key:
-            raise ValueError("OPENAI_API_KEY is required for LLM_PROVIDER=openai")
-        from src.infrastructure.llm.openai_adapter import OpenAIAdapter
-
-        return OpenAIAdapter(api_key=openai_api_key)
+        raise ValueError(
+            "LLM_PROVIDER='openai' is deprecated (OpenAI API is pay-per-token). "
+            "Use LLM_PROVIDER='codex' (Codex CLI) or 'ollama' (local) instead."
+        )
 
     raise ValueError(
         f"Unknown LLM_PROVIDER '{provider}'. "
-        "Supported values: claude, openai, mock"
+        "Supported values: claude-code, codex, ollama, mock"
     )
 
 
-def create_embedding_service(
-    provider: str,
-    openai_api_key: str | None = None,
-) -> "MockEmbeddingService":  # return type broadened to protocol when antigravity added
+def create_embedding_service(provider: str) -> "object":
     """Construct the appropriate embedding service.
 
-    Currently only OpenAI and mock are supported.
+    Args:
+        provider: One of "bge-m3", "mock".
+
+    Returns:
+        An EmbeddingProvider instance.
+
+    Raises:
+        ValueError: If provider is unknown or deprecated.
     """
     if provider == "mock":
+        from src.infrastructure.llm.mock_adapter import MockEmbeddingService
         return MockEmbeddingService()
 
-    if provider in ("claude", "openai"):
-        if not openai_api_key:
-            raise ValueError(
-                "OPENAI_API_KEY is required for embedding regardless of LLM_PROVIDER. "
-                "Set LLM_PROVIDER=mock to skip embedding."
-            )
-        from src.infrastructure.llm.openai_adapter import OpenAIEmbeddingService
+    if provider == "bge-m3":
+        from src.infrastructure.embedding.bge_m3_adapter import BGEM3EmbeddingAdapter
+        return BGEM3EmbeddingAdapter()
 
-        return OpenAIEmbeddingService(api_key=openai_api_key)  # type: ignore[return-value]
+    # Deprecated provider guard
+    if provider in ("openai", "claude"):
+        raise ValueError(
+            f"Embedding provider '{provider}' is deprecated (pay-per-token API). "
+            "Use EMBEDDING_PROVIDER='bge-m3' for local BGE-M3 embedding."
+        )
 
     raise ValueError(
-        f"Unknown provider for embedding '{provider}'. "
-        "Supported values: claude, openai, mock"
+        f"Unknown EMBEDDING_PROVIDER '{provider}'. "
+        "Supported values: bge-m3, mock"
     )

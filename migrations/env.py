@@ -20,10 +20,9 @@ database_url = os.environ.get("DATABASE_URL", "").replace(
 if database_url:
     config.set_main_option("sqlalchemy.url", database_url)
 
-# Import all models here so Alembic can detect schema changes
-# from src.infrastructure.db.models import Base
-# target_metadata = Base.metadata
-target_metadata = None  # TODO: wire when ORM models are implemented in Step 2
+# Import ORM models so Alembic can detect schema changes via autogenerate
+from src.infrastructure.db.models import Base  # noqa: E402
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
@@ -33,6 +32,9 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        # pgvector types are unrecognised by Alembic autogenerate;
+        # compare_type=False prevents spurious ALTER COLUMN diffs
+        compare_type=False,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -48,6 +50,7 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
+            compare_type=False,
         )
         with context.begin_transaction():
             context.run_migrations()

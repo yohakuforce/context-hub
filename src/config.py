@@ -2,6 +2,20 @@
 
 All config values come from environment variables (read via pydantic-settings).
 Never hardcode secrets here.
+
+LLM_PROVIDER values (2026-05-15 policy — subscription AI only, zero pay-per-token):
+  claude-code  — ClaudeCodeAdapter (subprocess: `claude -p`)
+  codex        — CodexAdapter (subprocess: `codex -q`)
+  ollama       — OllamaAdapter (HTTP to local Ollama server)
+  mock         — MockLLMAdapter (CI / key-free dev)
+
+DEPRECATED (removed):
+  claude  — Anthropic API (pay-per-token)
+  openai  — OpenAI API (pay-per-token)
+
+EMBEDDING_PROVIDER values:
+  bge-m3  — BGEM3EmbeddingAdapter (local FlagEmbedding, 1024-dim)
+  mock    — MockEmbeddingService (CI / key-free dev)
 """
 
 from __future__ import annotations
@@ -27,11 +41,18 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/context_hub"
     )
 
-    # --- LLM Provider ---
-    llm_provider: str = "mock"   # mock | claude | openai
-    anthropic_api_key: str | None = None
-    claude_model: str = "claude-3-5-sonnet-20241022"
-    openai_api_key: str | None = None
+    # --- LLM Provider (subscription AI only) ---
+    # Values: claude-code | codex | ollama | mock
+    llm_provider: str = "mock"
+    claude_code_timeout_seconds: float = 120.0
+    codex_timeout_seconds: float = 120.0
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "llama3"
+
+    # --- Embedding Provider (local, zero cost) ---
+    # Values: bge-m3 | mock
+    embedding_provider: str = "mock"
+    embedding_device: str = "cpu"   # cpu | cuda
 
     # --- Slack ---
     slack_bot_token: str | None = None

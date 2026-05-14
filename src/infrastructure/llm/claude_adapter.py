@@ -1,61 +1,26 @@
-"""Claude (Anthropic) LLM adapter.
+"""DEPRECATED: Direct Anthropic API adapter.
 
-Uses anthropic Python SDK. Provider is selected when LLM_PROVIDER=claude.
+This module is RETAINED for reference only and MUST NOT be used in production.
+
+Reason for deprecation (2026-05-15):
+  Context-Hub policy mandates zero usage of pay-per-token APIs.
+  Anthropic Claude API is a metered service and violates the "subscription AI only"
+  constraint defined in tech-stack.md Section 0-B.
+
+  Use ClaudeCodeAdapter (claude_code_adapter.py) instead, which drives
+  the Claude Code CLI (LLM_PROVIDER=claude-code) via subprocess — fully
+  covered by the existing Claude subscription with no additional charges.
+
+To remove this file: search for any remaining imports of ClaudeAdapter and
+replace with ClaudeCodeAdapter, then delete this file.
 """
 
-from __future__ import annotations
+# NOTE: This file intentionally imports nothing and defines no classes.
+# Keeping the file avoids a hard import error if any legacy code references it,
+# while the module-level docstring documents the deprecation clearly.
 
-from typing import Any
-
-import anthropic
-
-from src.infrastructure.llm.base import LLMAdapter, LLMMessage, LLMResponse
-
-
-class ClaudeAdapter(LLMAdapter):
-    """Adapter for Claude API via the Anthropic SDK."""
-
-    def __init__(self, api_key: str, model: str = "claude-3-5-sonnet-20241022") -> None:
-        self._client = anthropic.AsyncAnthropic(api_key=api_key)
-        self._model = model
-
-    async def generate(
-        self,
-        messages: list[LLMMessage],
-        system_prompt: str | None = None,
-        max_tokens: int = 2000,
-        temperature: float = 0.0,
-        **kwargs: Any,
-    ) -> LLMResponse:
-        anthropic_messages = [
-            {"role": msg.role, "content": msg.content} for msg in messages
-        ]
-
-        create_kwargs: dict[str, Any] = {
-            "model": self._model,
-            "max_tokens": max_tokens,
-            "messages": anthropic_messages,
-        }
-        if system_prompt:
-            create_kwargs["system"] = system_prompt
-        # Note: Claude API does not expose temperature in all endpoints,
-        # but include it for models that support it.
-        create_kwargs["temperature"] = temperature
-        create_kwargs.update(kwargs)
-
-        response = await self._client.messages.create(**create_kwargs)
-
-        content_text = ""
-        for block in response.content:
-            if hasattr(block, "text"):
-                content_text += block.text
-
-        return LLMResponse(
-            content=content_text,
-            model=response.model,
-            input_tokens=response.usage.input_tokens,
-            output_tokens=response.usage.output_tokens,
-        )
-
-    def provider_name(self) -> str:
-        return f"claude:{self._model}"
+raise ImportError(
+    "ClaudeAdapter (direct Anthropic API) is deprecated. "
+    "Set LLM_PROVIDER=claude-code and use ClaudeCodeAdapter instead. "
+    "See src/infrastructure/llm/claude_code_adapter.py."
+)

@@ -24,11 +24,17 @@ dependencies = [
     # Slack
     "slack-sdk>=3.27.0",
 
-    # OpenAI (Embedding + LLM)
-    "openai>=1.30.0",
+    # pgvector SQLAlchemy integration
+    "pgvector>=0.3.0",
 
-    # Anthropic Claude
-    "anthropic>=0.28.0",
+    # Local embedding — BGE-M3 via FlagEmbedding
+    # (FlagEmbedding and sentence-transformers are heavy; they are installed
+    #  separately in Dockerfile to allow Docker layer caching)
+    # Listed here for local dev completeness.
+    "FlagEmbedding>=1.2.0",
+    "sentence-transformers>=3.0.0",
+
+    # httpx already listed above for Backlog/Redmine; also used by OllamaAdapter
 
     # Whisper (local transcription)
     "openai-whisper>=20231117",
@@ -45,7 +51,7 @@ dependencies = [
     # MCP
     "mcp>=1.0.0",
 
-    # Utilities
+    # Utilities (OpenAI + Anthropic SDK intentionally excluded per 2026-05-15 policy)
     "python-dotenv>=1.0.0",
     "structlog>=23.0.0",
     "bcrypt>=4.0.0",
