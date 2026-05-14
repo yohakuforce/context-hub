@@ -1,0 +1,61 @@
+# Environment variables (NEVER commit real values)
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Audio / data files (never commit real data)
+/data/
+*.mp3
+*.mp4
+*.m4a
+*.wav
+
+# DB dumps (never commit)
+*.sql
+*.dump
+*.pgdump
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+.AppleDouble
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Alembic versions (keep tracked, but no real data)
+# migrations/versions/*.py  <- these should be committed
+
+# Docker override with secrets
+docker-compose.override.yml
