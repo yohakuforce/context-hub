@@ -35,6 +35,9 @@ from src.shared.types import (
 # RRF constant — 60 is the de-facto standard
 _RRF_K = 60
 
+# Maximum k to prevent DoS via unbounded queries (consistent with SQLite backend).
+_MAX_K: int = 1000
+
 
 class PostgresDocumentRepository(DocumentRepository):
     """Concrete Document repository backed by PostgreSQL."""
@@ -92,7 +95,11 @@ class PostgresDocumentRepository(DocumentRepository):
         top_k: int = 10,
         source_types: Optional[list[SourceType]] = None,
     ) -> list[tuple[Document, float]]:
-        """Pure vector similarity search (cosine distance via pgvector <=>)."""
+        """Pure vector similarity search (cosine distance via pgvector <=>).
+
+        top_k is capped at _MAX_K to prevent DoS via unbounded queries.
+        """
+        top_k = min(top_k, _MAX_K)
         vec_literal = _format_vector(vector.values)
         q = text(
             f"""
@@ -133,7 +140,9 @@ class PostgresDocumentRepository(DocumentRepository):
         """Hybrid search: tsvector + pgvector + JSONB metadata, fused via RRF.
 
         Returns documents ordered by descending RRF score.
+        top_k is capped at _MAX_K to prevent DoS via unbounded queries.
         """
+        top_k = min(top_k, _MAX_K)
         vec_literal = _format_vector(vector.values)
         source_filter = (
             "AND source_type = ANY(:source_types)" if source_types else ""

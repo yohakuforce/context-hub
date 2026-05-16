@@ -133,11 +133,16 @@ class SqliteDocumentRepository(DocumentRepository):
         scored = await asyncio.to_thread(
             self._sync_vector_search, query, str(project_id), top_k, source_types
         )
+        if not scored:
+            return []
+        ids = [doc_id for doc_id, _ in scored]
+        score_map = {doc_id: score for doc_id, score in scored}
+        rows = await asyncio.to_thread(self._sync_find_many_by_ids, ids)
         docs_with_scores: list[tuple[Document, float]] = []
-        for doc_id, score in scored:
-            doc = await self.find_by_id(DocumentId(doc_id))
-            if doc is not None:
-                docs_with_scores.append((doc, score))
+        for doc_id in ids:
+            row = rows.get(doc_id)
+            if row is not None:
+                docs_with_scores.append((_row_to_domain(row), score_map[doc_id]))
         return docs_with_scores
 
     async def hybrid_search(
@@ -189,14 +194,22 @@ class SqliteDocumentRepository(DocumentRepository):
 
         fused = reciprocal_rank_fusion(fts_scored, vec_scored, k=rrf_k, top_n=top_k)
 
+        if not fused:
+            return []
+
+        fused_ids = [item.doc_id for item in fused]
+        score_map = {item.doc_id: item.score for item in fused}
+        rows = await asyncio.to_thread(self._sync_find_many_by_ids, fused_ids)
+
         docs_with_scores: list[tuple[Document, float]] = []
-        for item in fused:
-            doc = await self.find_by_id(DocumentId(item.doc_id))
-            if doc is None:
+        for doc_id in fused_ids:
+            row = rows.get(doc_id)
+            if row is None:
                 continue
+            doc = _row_to_domain(row)
             if source_types and doc.source_type not in source_types:
                 continue
-            docs_with_scores.append((doc, item.score))
+            docs_with_scores.append((doc, score_map[doc_id]))
 
         return docs_with_scores
 
@@ -237,6 +250,32 @@ class SqliteDocumentRepository(DocumentRepository):
     # ------------------------------------------------------------------
     # Synchronous helpers
     # ------------------------------------------------------------------
+
+    def _sync_find_many_by_ids(self, ids: list[str]) -> dict[str, sqlite3.Row]:
+        """Fetch multiple documents by ID in a single query.
+
+        Returns a dict keyed by doc_id preserving lookup order.  Missing IDs
+        are absent from the dict.
+
+        Args:
+            ids: List of document UUID strings to fetch.
+
+        Returns:
+            Dict mapping doc_id → sqlite3.Row for each found document.
+        """
+        if not ids:
+            return {}
+        placeholders = ",".join("?" * len(ids))
+        with open_connection(self._db_path) as conn:
+            rows = conn.execute(
+                "SELECT id, project_id, source_type, external_id, raw_text, "
+                "  source_url, author_id, raw_created_at, summary, language, "
+                "  tags, entities, embedding_model, metadata, ingestion_job_id, "
+                "  created_at, updated_at "
+                f"FROM documents WHERE id IN ({placeholders})",
+                ids,
+            ).fetchall()
+            return {row[0]: row for row in rows}
 
     def _sync_find_by_id(self, doc_id: str) -> sqlite3.Row | None:
         with open_connection(self._db_path) as conn:

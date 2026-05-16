@@ -32,6 +32,9 @@ _EMBEDDING_DIM: int = 1024
 # Metadata is stored as JSON in a companion table (see _ensure_meta_table).
 _META_TABLE: str = "vec_store_meta"
 
+# Maximum k to prevent DoS via unbounded KNN scans.
+_MAX_K: int = 1000
+
 
 class SqliteVecStore:
     """VectorStore Protocol implementation backed by SQLite + sqlite-vec.
@@ -99,10 +102,11 @@ class SqliteVecStore:
         """
         _validate_embedding(query)
         blob = _to_blob(query)
+        capped_k = min(k, _MAX_K)
         # Over-fetch to allow post-filtering; cap at a reasonable ceiling.
-        fetch_k = k * 10 if filter else k
+        fetch_k = capped_k * 10 if filter else capped_k
         raw_rows = await asyncio.to_thread(self._sync_knn, blob, fetch_k)
-        return _apply_filter_and_score(raw_rows, filter, k)
+        return _apply_filter_and_score(raw_rows, filter, capped_k)
 
     async def delete(self, doc_id: str) -> None:
         """Remove a document from the vector index.

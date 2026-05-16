@@ -155,7 +155,10 @@ class SqliteIssueRepository(IssueRepository):
         return issue
 
     async def save_many(self, issues: list[Issue]) -> list[Issue]:
-        """Batch upsert issues.
+        """Batch upsert issues in a single connection and transaction.
+
+        Uses executemany() to avoid N separate connections and partial-commit
+        risk.  All rows are committed atomically; failure rolls back the batch.
 
         Args:
             issues: List of Issue domain objects to persist.
@@ -163,8 +166,9 @@ class SqliteIssueRepository(IssueRepository):
         Returns:
             The same list of Issue instances (unchanged).
         """
-        for issue in issues:
-            await self.save(issue)
+        if not issues:
+            return issues
+        await asyncio.to_thread(self._sync_save_many, issues)
         return issues
 
     # ------------------------------------------------------------------
@@ -254,6 +258,43 @@ class SqliteIssueRepository(IssueRepository):
                     (project_id,),
                 ).fetchone()
             return int(row[0]) if row else 0
+
+    def _sync_save_many(self, issues: list[Issue]) -> None:
+        """Execute a batch upsert of issues within a single connection."""
+        rows = [_domain_to_values(issue) for issue in issues]
+        params_list = [
+            (
+                v["id"], v["project_id"], v["source_type"], v["external_id"],
+                v["title"], v["description"], v["status"], v["priority"],
+                v["assignee_external_id"], v["assignee_name"], v["due_date"],
+                v["labels"], v["comments"], v["embedding_model"],
+                v["metadata"], v["created_at"], v["updated_at"],
+            )
+            for v in rows
+        ]
+        with open_connection(self._db_path) as conn:
+            conn.executemany(
+                "INSERT INTO issues ("
+                "  id, project_id, source_type, external_id, title, description, "
+                "  status, priority, assignee_external_id, assignee_name, due_date, "
+                "  labels, comments, embedding_model, metadata, created_at, updated_at"
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(project_id, source_type, external_id) DO UPDATE SET "
+                "  title = excluded.title, "
+                "  description = excluded.description, "
+                "  status = excluded.status, "
+                "  priority = excluded.priority, "
+                "  assignee_external_id = excluded.assignee_external_id, "
+                "  assignee_name = excluded.assignee_name, "
+                "  due_date = excluded.due_date, "
+                "  labels = excluded.labels, "
+                "  comments = excluded.comments, "
+                "  embedding_model = excluded.embedding_model, "
+                "  metadata = excluded.metadata, "
+                "  updated_at = excluded.updated_at",
+                params_list,
+            )
+            conn.commit()
 
     def _sync_save(self, issue: Issue) -> None:
         v = _domain_to_values(issue)

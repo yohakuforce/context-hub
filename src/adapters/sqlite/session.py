@@ -25,6 +25,9 @@ def _apply_connection_settings(conn: sqlite3.Connection) -> None:
     """
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    # busy_timeout lets the connection retry on SQLITE_BUSY instead of failing
+    # immediately.  30 000 ms matches the connect timeout below.
+    conn.execute("PRAGMA busy_timeout=30000")
     conn.row_factory = sqlite3.Row
 
 
@@ -64,7 +67,13 @@ def open_connection(db_path: str | Path) -> Generator[sqlite3.Connection, None, 
     Raises:
         RuntimeError: If sqlite-vec fails to load.
     """
-    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    # Each call to open_connection() creates a new connection that is closed
+    # before returning.  Connections are never shared across threads, so
+    # check_same_thread (the SQLite3 default of True) is safe and correct.
+    # timeout=30 causes Python to retry on SQLITE_BUSY for up to 30 seconds
+    # before raising OperationalError; busy_timeout PRAGMA provides the same
+    # guarantee at the C-library level.
+    conn = sqlite3.connect(str(db_path), timeout=30)
     try:
         load_sqlite_vec(conn)
         _apply_connection_settings(conn)

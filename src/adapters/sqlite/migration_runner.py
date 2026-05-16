@@ -79,7 +79,7 @@ class SqliteMigrationRunner:
             if not migration_files:
                 raise ValueError(
                     f"No migration files found for target revision {target!r} "
-                    f"in {self._schema_dir}"
+                    f"in schema directory '{self._schema_dir.name}'"
                 )
 
         applied = await asyncio.to_thread(self._sync_get_applied_revisions)
@@ -135,17 +135,30 @@ class SqliteMigrationRunner:
             return {row[0] for row in rows}
 
     def _sync_apply_migration(self, path: Path, revision: str) -> None:
-        """Execute a single SQL migration file and record its revision."""
+        """Execute a single SQL migration file and record its revision.
+
+        Uses individual execute() calls instead of executescript() so that the
+        migration SQL and the schema_migrations INSERT run in a single atomic
+        transaction; executescript() issues an implicit COMMIT which prevents
+        rollback on failure.
+        """
         sql = path.read_text(encoding="utf-8")
+        statements = [s.strip() for s in sql.split(";") if s.strip()]
+        applied_at = datetime.now(tz=UTC).isoformat()
         with open_connection(self._db_path) as conn:
-            conn.executescript(sql)
-            applied_at = datetime.now(tz=UTC).isoformat()
-            conn.execute(
-                "INSERT OR IGNORE INTO schema_migrations (revision, applied_at) "
-                "VALUES (?, ?)",
-                (revision, applied_at),
-            )
-            conn.commit()
+            try:
+                conn.execute("BEGIN")
+                for statement in statements:
+                    conn.execute(statement)
+                conn.execute(
+                    "INSERT OR IGNORE INTO schema_migrations (revision, applied_at) "
+                    "VALUES (?, ?)",
+                    (revision, applied_at),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
 
 
 # ---------------------------------------------------------------------------
