@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yohakuforce-context-hub"
-version = "0.1.0a6"
+version = "0.1.0a7"
 description = "Context collection and storage foundation for AI projects (MCP-native)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -74,6 +74,13 @@ dependencies = [
     # sqlite+aiosqlite:// (default for quickstart/personal profiles).
     "aiosqlite>=0.20.0",
 
+    # pgvector: provides the SQLAlchemy `Vector` column type used by
+    # `context_hub.infrastructure.db.models`. Even SQLite-only installs
+    # transitively import this module via `context_hub.api.dependencies`,
+    # so pgvector must be available at import time. Pure-Python, lightweight.
+    # (asyncpg stays in [postgres] extras because it requires libpq.)
+    "pgvector>=0.3.0",
+
     # Utilities (OpenAI + Anthropic SDK intentionally excluded per 2026-05-15 policy)
     "python-dotenv>=1.0.0",
     "structlog>=23.0.0",
@@ -121,10 +128,9 @@ dev = [
     "factory-boy>=3.3.0",
     "mypy>=1.10.0",
     "ruff>=0.4.0",
-    # postgres-backend models and tests are collected by default, so we need
-    # the [postgres] runtime deps available in CI too.
+    # postgres-backend tests are collected by default, so asyncpg must be
+    # available in CI. pgvector moved to core deps in 0.1.0a7.
     "asyncpg>=0.29.0",
-    "pgvector>=0.3.0",
 ]
 
 [tool.hatch.build.targets.wheel]
