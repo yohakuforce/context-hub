@@ -16,7 +16,7 @@ import sqlite_vec
 # Schema file relative to the project root.
 _SCHEMA_PATH = (
     Path(__file__).parent.parent.parent.parent.parent
-    / "schema" / "sqlite" / "001_init.sql"
+    / "context_hub" / "_sqlite_schema" / "001_init.sql"
 )
 
 

@@ -32,6 +32,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `asyncpg` and `pgvector` to `[dev]` extras so CI can collect the postgres-backend
   test modules (collection imports `context_hub.infrastructure.db.models`, which uses
   `pgvector.sqlalchemy.Vector` as a column type).
+- **Bundled SQLite schema (0.1.0a5)**: relocated `schema/sqlite/001_init.sql` to
+  `context_hub/_sqlite_schema/001_init.sql` so it ships in the wheel. The previous
+  location was both outside the package AND gitignored by a broad `*.sql` rule, so
+  `context-hub migrate` silently no-op'd on installed packages (the file was missing
+  from CI checkouts and from every published wheel).
+- `.gitignore` narrowed: `*.sql` → `data/**/*.sql` and `dumps/**/*.sql` so future
+  schema files cannot be silently dropped.
+- `SqliteMigrationRunner.upgrade()` now raises `FileNotFoundError` if the schema
+  directory is missing, instead of silently returning (was the root cause of v0.1.0a3
+  smoke test false-passing `migrate`).
 
 ### Fixed
 - mypy `no-any-return` error in `context_hub.adapters.sqlite.vec_store._to_blob`.

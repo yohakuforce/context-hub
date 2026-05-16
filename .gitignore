@@ -30,10 +30,12 @@ htmlcov/
 *.m4a
 *.wav
 
-# DB dumps (never commit)
-*.sql
+# DB dumps (never commit). Schema migration .sql files under
+# context_hub/_sqlite_schema/ are bundled and ship in the wheel.
 *.dump
 *.pgdump
+data/**/*.sql
+dumps/**/*.sql
 
 # IDE
 .vscode/

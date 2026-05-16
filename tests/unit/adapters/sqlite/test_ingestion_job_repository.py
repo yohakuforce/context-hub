@@ -33,7 +33,7 @@ def db_path(tmp_path: Path) -> str:
     conn.enable_load_extension(False)
     schema = (
         Path(__file__).parent.parent.parent.parent.parent
-        / "schema" / "sqlite" / "001_init.sql"
+        / "context_hub" / "_sqlite_schema" / "001_init.sql"
     )
     conn.executescript(schema.read_text(encoding="utf-8"))
     conn.close()

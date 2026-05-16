@@ -16,8 +16,10 @@ from pathlib import Path
 
 from context_hub.adapters.sqlite.session import open_connection
 
-# Default path for the bundled SQLite schema files.
-_SCHEMA_DIR: Path = Path(__file__).parent.parent.parent.parent / "schema" / "sqlite"
+# Default path for the bundled SQLite schema files. Lives inside the package
+# so it ships with the wheel (was previously at the repo-root `schema/sqlite/`,
+# which is not packaged).
+_SCHEMA_DIR: Path = Path(__file__).parent.parent.parent / "_sqlite_schema"
 
 # Revision string embedded in 001_init.sql.
 _INIT_REVISION: str = "001"
@@ -67,6 +69,14 @@ class SqliteMigrationRunner:
             ValueError: If *target* is not "head" and no matching file exists.
             FileNotFoundError: If *schema_dir* does not exist.
         """
+        if not self._schema_dir.exists():
+            raise FileNotFoundError(
+                f"Schema directory not found: {self._schema_dir}. "
+                "This indicates a broken installation — the bundled migration "
+                "files were not shipped with the package. Please report at "
+                "https://github.com/yohakuforce/context-hub/issues"
+            )
+
         migration_files = _discover_migrations(self._schema_dir)
         if not migration_files:
             return
