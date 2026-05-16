@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.config.profiles import ProfileSettings  # noqa: E402
+from context_hub.config.profiles import ProfileSettings  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -30,7 +30,7 @@ def _fresh_settings(profile: str, extra_env: dict[str, str] | None = None) -> Pr
     applied to the process environment, which Pydantic BaseSettings reads at
     a higher priority than constructor keyword arguments.
     """
-    from src.config.profiles import ProfileSettings, _build_profile_overrides
+    from context_hub.config.profiles import ProfileSettings, _build_profile_overrides
 
     # _build_profile_overrides now returns UPPER_CASE keys
     overrides = _build_profile_overrides(profile)  # type: ignore[arg-type]
@@ -147,20 +147,20 @@ class TestProductionProfile:
 
 class TestGetProfileSettings:
     def test_unknown_profile_raises(self) -> None:
-        from src.config.profiles import _validate_profile_name
+        from context_hub.config.profiles import _validate_profile_name
 
         with pytest.raises(ValueError, match="Unknown profile"):
             _validate_profile_name("staging")
 
     def test_ch_profile_env_var_resolves(self) -> None:
-        from src.config.profiles import _resolve_env_profile
+        from context_hub.config.profiles import _resolve_env_profile
 
         with patch.dict(os.environ, {"CH_PROFILE": "personal"}):
             resolved = _resolve_env_profile()
         assert resolved == "personal"
 
     def test_ch_profile_defaults_to_quickstart(self) -> None:
-        from src.config.profiles import _resolve_env_profile
+        from context_hub.config.profiles import _resolve_env_profile
 
         env = os.environ.copy()
         env.pop("CH_PROFILE", None)
@@ -238,7 +238,7 @@ class TestProductionSecretKeyValidation:
         so we must also explicitly set SECRET_KEY= in the env to test the
         empty-string guard path.
         """
-        from src.config.profiles import _build_profile_overrides
+        from context_hub.config.profiles import _build_profile_overrides
 
         # Build production overrides but force SECRET_KEY to empty
         overrides = _build_profile_overrides("production")  # type: ignore[arg-type]

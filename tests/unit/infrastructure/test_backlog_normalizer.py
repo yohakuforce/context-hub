@@ -4,12 +4,12 @@ from datetime import datetime
 
 import pytest
 
-from src.infrastructure.adapters.backlog.normalizer import (
+from context_hub.infrastructure.adapters.backlog.normalizer import (
     normalise_comment,
     normalise_issue,
     normalise_wiki,
 )
-from src.shared.types import IssueStatus, IssuePriority, ProjectId, SourceType, new_id
+from context_hub.shared.types import IssueStatus, IssuePriority, ProjectId, SourceType, new_id
 
 
 def _project_id() -> ProjectId:

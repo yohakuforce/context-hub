@@ -12,18 +12,18 @@ from datetime import datetime
 from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
-from src.application.ingestion_service import IngestionService
-from src.domain.document.entities import Document
-from src.domain.ingestion.entities import IngestionJob
-from src.domain.ingestion.repository import IngestionJobRepository
-from src.domain.issue.entities import Issue
-from src.domain.issue.repository import IssueRepository
-from src.domain.document.repository import DocumentRepository
-from src.infrastructure.adapters.slack.adapter import SlackAdapter
-from src.infrastructure.adapters.backlog.adapter import BacklogAdapter
-from src.infrastructure.adapters.redmine.adapter import RedmineAdapter
-from src.infrastructure.embedding.mock_adapter import MockEmbeddingAdapter
-from src.shared.types import (
+from context_hub.application.ingestion_service import IngestionService
+from context_hub.domain.document.entities import Document
+from context_hub.domain.ingestion.entities import IngestionJob
+from context_hub.domain.ingestion.repository import IngestionJobRepository
+from context_hub.domain.issue.entities import Issue
+from context_hub.domain.issue.repository import IssueRepository
+from context_hub.domain.document.repository import DocumentRepository
+from context_hub.infrastructure.adapters.slack.adapter import SlackAdapter
+from context_hub.infrastructure.adapters.backlog.adapter import BacklogAdapter
+from context_hub.infrastructure.adapters.redmine.adapter import RedmineAdapter
+from context_hub.infrastructure.embedding.mock_adapter import MockEmbeddingAdapter
+from context_hub.shared.types import (
     EmbeddingVector,
     IngestionJobId,
     IssueStatus,
@@ -424,7 +424,7 @@ class TestRedmineIngestion:
     @pytest.mark.asyncio
     async def test_redmine_adapter_failure_marks_job_failed(self):
         """Adapter raising an exception should result in a FAILED job."""
-        from src.infrastructure.adapters.base import SourceAdapter, IngestionResult
+        from context_hub.infrastructure.adapters.base import SourceAdapter, IngestionResult
 
         class FailingAdapter(SourceAdapter):
             @property

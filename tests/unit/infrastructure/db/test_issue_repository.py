@@ -7,14 +7,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.domain.issue.entities import Comment, Issue
-from src.infrastructure.db.issue_repository import (
+from context_hub.domain.issue.entities import Comment, Issue
+from context_hub.infrastructure.db.issue_repository import (
     _domain_to_values,
     _row_to_domain,
     PostgresIssueRepository,
 )
-from src.infrastructure.db.models import IssueRow
-from src.shared.types import (
+from context_hub.infrastructure.db.models import IssueRow
+from context_hub.shared.types import (
     CommentId,
     EmbeddingVector,
     IssueId,

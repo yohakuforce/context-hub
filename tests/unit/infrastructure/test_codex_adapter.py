@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.infrastructure.llm.base import LLMMessage
-from src.infrastructure.llm.codex_adapter import CodexAdapter, _build_prompt
+from context_hub.infrastructure.llm.base import LLMMessage
+from context_hub.infrastructure.llm.codex_adapter import CodexAdapter, _build_prompt
 
 
 class TestBuildPrompt:

@@ -1,11 +1,11 @@
 """Unit tests for Redmine normalizer."""
 
-from src.infrastructure.adapters.redmine.normalizer import (
+from context_hub.infrastructure.adapters.redmine.normalizer import (
     normalise_issue,
     normalise_journal,
     normalise_wiki,
 )
-from src.shared.types import IssueStatus, IssuePriority, ProjectId, SourceType, new_id
+from context_hub.shared.types import IssueStatus, IssuePriority, ProjectId, SourceType, new_id
 
 
 def _project_id() -> ProjectId:

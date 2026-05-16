@@ -3,8 +3,8 @@
 import pytest
 from datetime import datetime
 
-from src.domain.ingestion.entities import IngestionJob
-from src.shared.types import (
+from context_hub.domain.ingestion.entities import IngestionJob
+from context_hub.shared.types import (
     IngestionJobId,
     JobStatus,
     ProjectId,

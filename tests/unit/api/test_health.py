@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from src.main import app
+from context_hub.main import app
 
 _DEV_KEY = "test-dev-key-for-unit-tests"
 
@@ -20,7 +20,7 @@ def client():
 @pytest.fixture
 def client_with_dev_key():
     """TestClient with DEV_API_KEY injected into the auth module."""
-    import src.api.middleware.auth as auth_mod
+    import context_hub.api.middleware.auth as auth_mod
 
     with patch.object(auth_mod, "_DEV_API_KEY", _DEV_KEY), patch.object(
         auth_mod, "_APP_ENV", "development"

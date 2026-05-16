@@ -27,17 +27,13 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Lint (ruff)
-        # Scoped to new modules only — existing legacy src/ errors are tracked
-        # separately and will be resolved in the namespace-refactor task (T-007a).
-        run: ruff check src/mcp src/cli src/config src/core src/adapters/sqlite src/adapters/scheduler tests/unit/test_cli.py tests/unit/test_mcp.py
+        run: ruff check context_hub/mcp context_hub/cli context_hub/config context_hub/core context_hub/adapters/sqlite context_hub/adapters/scheduler tests/unit/test_cli.py tests/unit/test_mcp.py
 
       - name: Type check (mypy)
-        # Scoped to new modules only — existing legacy src/adapters/postgres errors
-        # are tracked separately (T-007a). sqlite/scheduler adapters are clean.
-        run: mypy src/mcp src/cli src/config src/core src/adapters/sqlite src/adapters/scheduler
+        run: mypy context_hub/mcp context_hub/cli context_hub/config context_hub/core context_hub/adapters/sqlite context_hub/adapters/scheduler
 
       - name: Run tests
-        run: pytest tests/ -W error::RuntimeWarning --cov=src --cov-report=term-missing --cov-fail-under=80
+        run: pytest tests/ -W error::RuntimeWarning --cov=context_hub --cov-report=term-missing --cov-fail-under=80
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4

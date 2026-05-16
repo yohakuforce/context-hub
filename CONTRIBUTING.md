@@ -29,8 +29,8 @@ pytest tests/
 Run linting and type checking:
 
 ```bash
-ruff check src/ tests/
-mypy src/
+ruff check context_hub/ tests/
+mypy context_hub/
 ```
 
 ## Code Style
@@ -52,7 +52,7 @@ pytest tests/
 pytest tests/ -W error::RuntimeWarning
 
 # Coverage report
-pytest tests/ --cov=src --cov-report=term-missing
+pytest tests/ --cov=context_hub --cov-report=term-missing
 ```
 
 ## Commit Messages

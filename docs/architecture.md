@@ -13,7 +13,7 @@ as the core entities.
 **Rationale**: Separating domain logic from infrastructure allows the storage backend
 (SQLite vs PostgreSQL) to be swapped without touching business logic.
 
-**Key types** (see `src/domain/`, `src/shared/types.py`):
+**Key types** (see `context_hub/domain/`, `context_hub/shared/types.py`):
 
 - `ProjectId` — `NewType(str, UUID)` wrapper, prevents mixing raw strings
 - `Document` — immutable dataclass with content, embedding vector, source metadata
@@ -31,7 +31,7 @@ as the core entities.
 - Easy to mock in tests (no database required for unit tests)
 - Enables the quickstart SQLite adapter and production PostgreSQL adapter to be swapped
 
-**Interfaces** (see `src/core/`):
+**Interfaces** (see `context_hub/core/`):
 
 - `DocumentRepository` — `find_by_id`, `find_all`, `save`, `delete`
 - `ProjectRepository` — same CRUD set
@@ -68,7 +68,7 @@ search using Reciprocal Rank Fusion (RRF) to merge result sets.
 FTS5 handles exact matches but has no semantic understanding. RRF (k=60) is a simple,
 parameter-free fusion method that works well in practice.
 
-**Implementation** (see `src/services/hybrid.py`):
+**Implementation** (see `context_hub/services/hybrid.py`):
 - Both backends produce a ranked list of `(document_id, score)` pairs
 - RRF formula: `score(d) = sum(1 / (k + rank(d)))` across backends
 - Merged result is re-ranked by RRF score and truncated to `top_k`
@@ -92,22 +92,22 @@ Claude Desktop / Claude Code
          |
          | stdio (JSON-RPC 2.0)
          v
-   src/mcp/server.py          <-- thin MCP adapter
+   context_hub/mcp/server.py          <-- thin MCP adapter
          |
          | calls
          v
-   src/application/           <-- shared QueryService, IngestionService
+   context_hub/application/           <-- shared QueryService, IngestionService
    query_service.py
          |
          | depends on
          v
-   src/core/ (Protocols)      <-- VectorStore, FTSStore, SchedulerStore
+   context_hub/core/ (Protocols)      <-- VectorStore, FTSStore, SchedulerStore
          |
          v
    SQLite / PostgreSQL
 ```
 
-**MCP Protocol Version**: `2024-11-05` (exported as `MCP_PROTOCOL_VERSION` from `src/mcp/__init__.py`)
+**MCP Protocol Version**: `2024-11-05` (exported as `MCP_PROTOCOL_VERSION` from `context_hub/mcp/__init__.py`)
 
 **HTTP compatibility check**: `GET /mcp/version` returns the protocol version so AI-PM
 can verify compatibility at startup without opening the stdio channel.
@@ -128,13 +128,13 @@ can verify compatibility at startup without opening the stdio channel.
 │  ┌─────────────────┐        ┌───────────────────────────────┐  │
 │  │  MCP Server     │        │  FastAPI (HTTP REST)          │  │
 │  │  stdio JSON-RPC │        │  /api/v1/{projects,query,...} │  │
-│  │  src/mcp/       │        │  src/api/                     │  │
+│  │  context_hub/mcp/       │        │  context_hub/api/                     │  │
 │  └────────┬────────┘        └──────────────┬────────────────┘  │
 │           │                                │                   │
 │           └───────────────┬────────────────┘                   │
 │                           ▼                                    │
-│              src/application/query_service.py                  │
-│              src/application/ingestion_service.py              │
+│              context_hub/application/query_service.py                  │
+│              context_hub/application/ingestion_service.py              │
 │                           │                                    │
 │           ┌───────────────┼────────────────┐                   │
 │           ▼               ▼                ▼                   │

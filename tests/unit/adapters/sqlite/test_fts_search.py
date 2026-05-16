@@ -17,8 +17,8 @@ from pathlib import Path
 import pytest
 import sqlite_vec
 
-from src.adapters.sqlite.fts_search import SqliteFts5Search
-from src.core.fts import FullTextSearch
+from context_hub.adapters.sqlite.fts_search import SqliteFts5Search
+from context_hub.core.fts import FullTextSearch
 
 
 @pytest.fixture
@@ -202,7 +202,7 @@ class TestSqliteFts5Search:
 
     async def test_k_capped_at_max_k(self, db_path: str) -> None:
         """Passing k > _MAX_K must not raise and must return at most _MAX_K results."""
-        from src.adapters.sqlite.fts_search import _MAX_K
+        from context_hub.adapters.sqlite.fts_search import _MAX_K
         fts = SqliteFts5Search(db_path)
         await fts.index(
             "doc-1", "overflow limit test content here",

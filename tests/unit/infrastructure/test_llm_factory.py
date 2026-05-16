@@ -2,8 +2,8 @@
 
 import pytest
 
-from src.infrastructure.llm.factory import create_llm_adapter, create_embedding_service
-from src.infrastructure.llm.mock_adapter import MockLLMAdapter, MockEmbeddingService
+from context_hub.infrastructure.llm.factory import create_llm_adapter, create_embedding_service
+from context_hub.infrastructure.llm.mock_adapter import MockLLMAdapter, MockEmbeddingService
 
 
 class TestCreateLLMAdapterMock:
@@ -18,7 +18,7 @@ class TestCreateLLMAdapterMock:
 
 class TestCreateLLMAdapterClaudeCode:
     def test_claude_code_returns_adapter(self) -> None:
-        from src.infrastructure.llm.claude_code_adapter import ClaudeCodeAdapter
+        from context_hub.infrastructure.llm.claude_code_adapter import ClaudeCodeAdapter
         adapter = create_llm_adapter(provider="claude-code")
         assert isinstance(adapter, ClaudeCodeAdapter)
 
@@ -27,7 +27,7 @@ class TestCreateLLMAdapterClaudeCode:
         assert adapter.provider_name() == "claude-code"
 
     def test_claude_code_custom_timeout(self) -> None:
-        from src.infrastructure.llm.claude_code_adapter import ClaudeCodeAdapter
+        from context_hub.infrastructure.llm.claude_code_adapter import ClaudeCodeAdapter
         adapter = create_llm_adapter(provider="claude-code", claude_code_timeout=30.0)
         assert isinstance(adapter, ClaudeCodeAdapter)
         assert adapter._timeout == 30.0
@@ -35,7 +35,7 @@ class TestCreateLLMAdapterClaudeCode:
 
 class TestCreateLLMAdapterCodex:
     def test_codex_returns_adapter(self) -> None:
-        from src.infrastructure.llm.codex_adapter import CodexAdapter
+        from context_hub.infrastructure.llm.codex_adapter import CodexAdapter
         adapter = create_llm_adapter(provider="codex")
         assert isinstance(adapter, CodexAdapter)
 
@@ -46,7 +46,7 @@ class TestCreateLLMAdapterCodex:
 
 class TestCreateLLMAdapterOllama:
     def test_ollama_returns_adapter(self) -> None:
-        from src.infrastructure.llm.ollama_adapter import OllamaAdapter
+        from context_hub.infrastructure.llm.ollama_adapter import OllamaAdapter
         adapter = create_llm_adapter(provider="ollama")
         assert isinstance(adapter, OllamaAdapter)
 
@@ -91,7 +91,7 @@ class TestCreateEmbeddingService:
 class TestMockLLMAdapter:
     @pytest.mark.asyncio
     async def test_generate_returns_response(self) -> None:
-        from src.infrastructure.llm.base import LLMMessage
+        from context_hub.infrastructure.llm.base import LLMMessage
 
         adapter = MockLLMAdapter()
         response = await adapter.generate(

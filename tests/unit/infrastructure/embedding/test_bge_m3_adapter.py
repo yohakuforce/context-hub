@@ -10,12 +10,12 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from src.infrastructure.embedding.bge_m3_adapter import (
+from context_hub.infrastructure.embedding.bge_m3_adapter import (
     BGEM3EmbeddingAdapter,
     _DIMENSIONS,
     _MODEL_NAME,
 )
-from src.shared.types import EmbeddingVector
+from context_hub.shared.types import EmbeddingVector
 
 
 def _make_mock_model(batch_size: int = 1) -> MagicMock:

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.infrastructure.embedding.mock_adapter import MockEmbeddingAdapter
-from src.infrastructure.embedding.factory import get_embedding_provider
+from context_hub.infrastructure.embedding.mock_adapter import MockEmbeddingAdapter
+from context_hub.infrastructure.embedding.factory import get_embedding_provider
 
 
 class TestMockEmbeddingAdapter:

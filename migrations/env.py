@@ -21,7 +21,7 @@ if database_url:
     config.set_main_option("sqlalchemy.url", database_url)
 
 # Import ORM models so Alembic can detect schema changes via autogenerate
-from src.infrastructure.db.models import Base  # noqa: E402
+from context_hub.infrastructure.db.models import Base  # noqa: E402
 target_metadata = Base.metadata
 
 

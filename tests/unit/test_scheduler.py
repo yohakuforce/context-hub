@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.scheduler import get_scheduler, _build_adapter
-from src.shared.types import SourceType
+from context_hub.scheduler import get_scheduler, _build_adapter
+from context_hub.shared.types import SourceType
 
 
 class MockSourceConfig:

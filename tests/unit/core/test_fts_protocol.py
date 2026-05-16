@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from src.core.fts import FullTextSearch
-from src.core.vectorstore import ScoredId
+from context_hub.core.fts import FullTextSearch
+from context_hub.core.vectorstore import ScoredId
 
 # ---------------------------------------------------------------------------
 # Minimal conforming implementation

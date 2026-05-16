@@ -7,14 +7,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.domain.ingestion.entities import IngestionJob
-from src.infrastructure.db.ingestion_job_repository import (
+from context_hub.domain.ingestion.entities import IngestionJob
+from context_hub.infrastructure.db.ingestion_job_repository import (
     PostgresIngestionJobRepository,
     _domain_to_row,
     _row_to_domain,
 )
-from src.infrastructure.db.models import IngestionJobRow
-from src.shared.types import (
+from context_hub.infrastructure.db.models import IngestionJobRow
+from context_hub.shared.types import (
     IngestionJobId,
     JobStatus,
     ProjectId,

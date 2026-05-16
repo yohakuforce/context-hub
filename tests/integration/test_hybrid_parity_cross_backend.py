@@ -27,13 +27,13 @@ import numpy as np
 import pytest
 import sqlite_vec
 
-from src.adapters.sqlite.document_repository import SqliteDocumentRepository
-from src.adapters.sqlite.project_repository import SqliteProjectRepository
-from src.core.vectorstore import ScoredId
-from src.domain.document.entities import Document
-from src.domain.project.entities import Project
-from src.services.hybrid import reciprocal_rank_fusion
-from src.shared.types import (
+from context_hub.adapters.sqlite.document_repository import SqliteDocumentRepository
+from context_hub.adapters.sqlite.project_repository import SqliteProjectRepository
+from context_hub.core.vectorstore import ScoredId
+from context_hub.domain.document.entities import Document
+from context_hub.domain.project.entities import Project
+from context_hub.services.hybrid import reciprocal_rank_fusion
+from context_hub.shared.types import (
     DocumentId,
     EmbeddingVector,
     ProjectId,

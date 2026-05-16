@@ -10,16 +10,16 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.domain.project.entities import Project, SourceConfig
-from src.infrastructure.db.models import ProjectRow
-from src.infrastructure.db.project_repository import (
+from context_hub.domain.project.entities import Project, SourceConfig
+from context_hub.infrastructure.db.models import ProjectRow
+from context_hub.infrastructure.db.project_repository import (
     PostgresProjectRepository,
     _domain_to_row,
     _json_to_source,
     _row_to_domain,
     _sources_to_json,
 )
-from src.shared.types import ProjectId, SourceType
+from context_hub.shared.types import ProjectId, SourceType
 
 
 def _make_project(name: str = "Test Project") -> Project:

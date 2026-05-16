@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
-from src.cli.main import app
+from context_hub.cli.main import app
 
 runner = CliRunner()
 
@@ -46,7 +46,7 @@ def _inject_module_mock(name: str, **attrs: object) -> MagicMock:
     """Insert a MagicMock module into sys.modules for the duration of a test.
 
     Args:
-        name:   Dotted module path (e.g. 'src.config.profiles').
+        name:   Dotted module path (e.g. 'context_hub.config.profiles').
         **attrs: Attributes to set on the mock module.
 
     Returns:
@@ -165,7 +165,7 @@ class TestServeCommand:
         assert result.exit_code == 0
         mock_run.assert_called_once()
         call_args, call_kwargs = mock_run.call_args
-        assert call_args[0] == "src.main:app"
+        assert call_args[0] == "context_hub.main:app"
         assert call_kwargs["host"] == "0.0.0.0"
         assert call_kwargs["port"] == 9000
 
@@ -315,20 +315,20 @@ class TestRunMigrateAsync:
     @pytest.mark.asyncio
     async def test_dry_run_prints_and_returns(self) -> None:
         """_run_migrate dry_run=True should print info and return without DB access."""
-        from src.cli.main import _run_migrate
+        from context_hub.cli.main import _run_migrate
 
         settings_mock = _mock_settings()
         mock_profiles = MagicMock()
         mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
 
-        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}):
+        with patch.dict(sys.modules, {"context_hub.config.profiles": mock_profiles}):
             # Must not raise
             await _run_migrate(target="head", dry_run=True)
 
     @pytest.mark.asyncio
     async def test_sqlite_calls_migration_runner_upgrade(self) -> None:
         """_run_migrate with a SQLite URL calls SqliteMigrationRunner.upgrade."""
-        from src.cli.main import _run_migrate
+        from context_hub.cli.main import _run_migrate
 
         mock_runner = AsyncMock()
         mock_runner.current_revision.return_value = None
@@ -343,8 +343,8 @@ class TestRunMigrateAsync:
         with patch.dict(
             sys.modules,
             {
-                "src.config.profiles": mock_profiles,
-                "src.adapters.sqlite.migration_runner": mock_migration_module,
+                "context_hub.config.profiles": mock_profiles,
+                "context_hub.adapters.sqlite.migration_runner": mock_migration_module,
             },
         ):
             await _run_migrate(target="head", dry_run=False)
@@ -365,7 +365,7 @@ class TestRunQueryAsync:
         """_run_query should raise typer.Exit(1) for PostgreSQL URLs in v0.1."""
         import click
 
-        from src.cli.main import _run_query
+        from context_hub.cli.main import _run_query
 
         settings_mock = _mock_settings(
             db_url="postgresql+asyncpg://postgres:pass@localhost/context_hub"
@@ -373,7 +373,7 @@ class TestRunQueryAsync:
         mock_profiles = MagicMock()
         mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
 
-        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}):
+        with patch.dict(sys.modules, {"context_hub.config.profiles": mock_profiles}):
             # typer.Exit wraps click.exceptions.Exit — catch the correct exception
             with pytest.raises((click.exceptions.Exit, SystemExit)) as exc_info:
                 await _run_query(
@@ -394,7 +394,7 @@ class TestRunQueryAsync:
     @pytest.mark.asyncio
     async def test_query_calls_search_service(self) -> None:
         """_run_query should call QueryService.search with the provided text."""
-        from src.cli.main import _run_query
+        from context_hub.cli.main import _run_query
 
         mock_result = MagicMock()
         mock_result.score = 0.987
@@ -432,11 +432,11 @@ class TestRunQueryAsync:
         with patch.dict(
             sys.modules,
             {
-                "src.config.profiles": mock_profiles,
-                "src.infrastructure.embedding.factory": mock_embedding_factory,
-                "src.adapters.sqlite.document_repository": mock_doc_repo_module,
-                "src.adapters.sqlite.project_repository": mock_proj_repo_module,
-                "src.application.query_service": mock_qs_module,
+                "context_hub.config.profiles": mock_profiles,
+                "context_hub.infrastructure.embedding.factory": mock_embedding_factory,
+                "context_hub.adapters.sqlite.document_repository": mock_doc_repo_module,
+                "context_hub.adapters.sqlite.project_repository": mock_proj_repo_module,
+                "context_hub.application.query_service": mock_qs_module,
             },
         ):
             await _run_query(
@@ -451,7 +451,7 @@ class TestRunQueryAsync:
     @pytest.mark.asyncio
     async def test_query_no_results_outputs_message(self) -> None:
         """_run_query with empty results should output 'No results found.'."""
-        from src.cli.main import _run_query
+        from context_hub.cli.main import _run_query
 
         mock_service = AsyncMock()
         mock_service.search.return_value = []
@@ -488,11 +488,11 @@ class TestRunQueryAsync:
         with patch.dict(
             sys.modules,
             {
-                "src.config.profiles": mock_profiles,
-                "src.infrastructure.embedding.factory": mock_embedding_factory,
-                "src.adapters.sqlite.document_repository": mock_doc_repo_module,
-                "src.adapters.sqlite.project_repository": mock_proj_repo_module,
-                "src.application.query_service": mock_qs_module,
+                "context_hub.config.profiles": mock_profiles,
+                "context_hub.infrastructure.embedding.factory": mock_embedding_factory,
+                "context_hub.adapters.sqlite.document_repository": mock_doc_repo_module,
+                "context_hub.adapters.sqlite.project_repository": mock_proj_repo_module,
+                "context_hub.application.query_service": mock_qs_module,
             },
         ), patch("typer.echo", side_effect=capture_echo):
             await _run_query(
@@ -521,7 +521,7 @@ class TestMigratePasswordMask:
         the dry-run output must contain '***' (SQLAlchemy's hide_password mask)
         and must NOT contain the literal 'secret'.
         """
-        from src.cli.main import _run_migrate
+        from context_hub.cli.main import _run_migrate
 
         settings_mock = _mock_settings(
             db_url="postgresql+asyncpg://user:secret@host/db",
@@ -535,7 +535,7 @@ class TestMigratePasswordMask:
         def capture_echo(msg: str = "", **_: object) -> None:
             output_lines.append(str(msg))
 
-        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}), patch(
+        with patch.dict(sys.modules, {"context_hub.config.profiles": mock_profiles}), patch(
             "typer.echo", side_effect=capture_echo
         ):
             await _run_migrate(target="head", dry_run=True)
@@ -553,7 +553,7 @@ class TestMigratePasswordMask:
         SQLite URLs have no password, so neither 'secret' nor '***' are expected.
         The output should still contain the database path.
         """
-        from src.cli.main import _run_migrate
+        from context_hub.cli.main import _run_migrate
 
         settings_mock = _mock_settings(
             db_url="sqlite+aiosqlite:///./data/context_hub.db",
@@ -566,7 +566,7 @@ class TestMigratePasswordMask:
         def capture_echo(msg: str = "", **_: object) -> None:
             output_lines.append(str(msg))
 
-        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}), patch(
+        with patch.dict(sys.modules, {"context_hub.config.profiles": mock_profiles}), patch(
             "typer.echo", side_effect=capture_echo
         ):
             await _run_migrate(target="head", dry_run=True)
@@ -661,7 +661,7 @@ class TestServeAdditionalPaths:
         mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
 
         with patch.object(uvicorn, "run"), patch.dict(
-            sys.modules, {"src.config.profiles": mock_profiles}
+            sys.modules, {"context_hub.config.profiles": mock_profiles}
         ):
             result = runner.invoke(app, ["serve", "--reload"])
 
@@ -674,7 +674,7 @@ class TestServeAdditionalPaths:
         with patch("asyncio.run", side_effect=lambda coro: coro.close()):
             with patch.dict(
                 sys.modules,
-                {"src.mcp.server": MagicMock(run_stdio=AsyncMock())},
+                {"context_hub.mcp.server": MagicMock(run_stdio=AsyncMock())},
             ):
                 result = runner.invoke(app, ["serve", "--mcp-only"])
 
@@ -689,7 +689,7 @@ class TestMigrateAdditionalPaths:
     @pytest.mark.asyncio
     async def test_postgres_migrate_calls_alembic(self) -> None:
         """_run_migrate with PostgreSQL URL calls subprocess alembic upgrade."""
-        from src.cli.main import _run_migrate
+        from context_hub.cli.main import _run_migrate
 
         settings_mock = _mock_settings(
             db_url="postgresql+asyncpg://user:pass@host/db",
@@ -703,7 +703,7 @@ class TestMigrateAdditionalPaths:
         mock_result.stdout = "alembic upgrade output"
         mock_result.stderr = ""
 
-        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}), patch(
+        with patch.dict(sys.modules, {"context_hub.config.profiles": mock_profiles}), patch(
             "subprocess.run", return_value=mock_result
         ):
             await _run_migrate(target="head", dry_run=False)
@@ -713,7 +713,7 @@ class TestMigrateAdditionalPaths:
         """_run_migrate with PostgreSQL URL raises typer.Exit when alembic fails."""
         import click
 
-        from src.cli.main import _run_migrate
+        from context_hub.cli.main import _run_migrate
 
         settings_mock = _mock_settings(
             db_url="postgresql+asyncpg://user:pass@host/db",
@@ -727,7 +727,7 @@ class TestMigrateAdditionalPaths:
         mock_result.stdout = ""
         mock_result.stderr = "alembic error"
 
-        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}), patch(
+        with patch.dict(sys.modules, {"context_hub.config.profiles": mock_profiles}), patch(
             "subprocess.run", return_value=mock_result
         ):
             with pytest.raises((click.exceptions.Exit, SystemExit)):
@@ -740,7 +740,7 @@ class TestMigrateAdditionalPaths:
         mock_profiles = MagicMock()
         mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
 
-        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}), patch(
+        with patch.dict(sys.modules, {"context_hub.config.profiles": mock_profiles}), patch(
             "typer.confirm", side_effect=SystemExit(1)
         ):
             result = runner.invoke(app, ["migrate"])
@@ -754,7 +754,7 @@ class TestMigrateAdditionalPaths:
         mock_profiles = MagicMock()
         mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
 
-        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}), patch(
+        with patch.dict(sys.modules, {"context_hub.config.profiles": mock_profiles}), patch(
             "asyncio.run", side_effect=lambda coro: coro.close()
         ):
             result = runner.invoke(app, ["migrate", "--yes"])
@@ -769,7 +769,7 @@ class TestIngestAdditionalPaths:
         """_run_ingest should raise typer.Exit(1) for PostgreSQL URLs in v0.1."""
         import click
 
-        from src.cli.main import _run_ingest
+        from context_hub.cli.main import _run_ingest
 
         settings_mock = _mock_settings(
             db_url="postgresql+asyncpg://user:pass@host/db",
@@ -785,8 +785,8 @@ class TestIngestAdditionalPaths:
         with patch.dict(
             sys.modules,
             {
-                "src.config.profiles": mock_profiles,
-                "src.infrastructure.embedding.factory": mock_embedding_factory,
+                "context_hub.config.profiles": mock_profiles,
+                "context_hub.infrastructure.embedding.factory": mock_embedding_factory,
             },
         ):
             with pytest.raises((click.exceptions.Exit, SystemExit)) as exc_info:
@@ -804,7 +804,7 @@ class TestIngestAdditionalPaths:
         """_run_ingest should exit 1 when no projects exist and project_id is None."""
         import click
 
-        from src.cli.main import _run_ingest
+        from context_hub.cli.main import _run_ingest
 
         settings_mock = _mock_settings()
         mock_profiles = MagicMock()
@@ -828,13 +828,13 @@ class TestIngestAdditionalPaths:
         with patch.dict(
             sys.modules,
             {
-                "src.config.profiles": mock_profiles,
-                "src.infrastructure.embedding.factory": mock_embedding_factory,
-                "src.adapters.sqlite.project_repository": mock_proj_repo_module,
-                "src.adapters.sqlite.document_repository": mock_doc_repo_module,
-                "src.adapters.sqlite.ingestion_job_repository": mock_job_repo_module,
-                "src.adapters.sqlite.issue_repository": mock_issue_repo_module,
-                "src.application.ingestion_service": mock_ingest_module,
+                "context_hub.config.profiles": mock_profiles,
+                "context_hub.infrastructure.embedding.factory": mock_embedding_factory,
+                "context_hub.adapters.sqlite.project_repository": mock_proj_repo_module,
+                "context_hub.adapters.sqlite.document_repository": mock_doc_repo_module,
+                "context_hub.adapters.sqlite.ingestion_job_repository": mock_job_repo_module,
+                "context_hub.adapters.sqlite.issue_repository": mock_issue_repo_module,
+                "context_hub.application.ingestion_service": mock_ingest_module,
             },
         ):
             with pytest.raises((click.exceptions.Exit, SystemExit)) as exc_info:
@@ -856,7 +856,7 @@ class TestQueryAdditionalPaths:
         """_run_query with output_json=True should emit valid JSON to typer.echo."""
         import json as _json
 
-        from src.cli.main import _run_query
+        from context_hub.cli.main import _run_query
 
         mock_result = MagicMock()
         mock_result.score = 0.95
@@ -899,11 +899,11 @@ class TestQueryAdditionalPaths:
         with patch.dict(
             sys.modules,
             {
-                "src.config.profiles": mock_profiles,
-                "src.infrastructure.embedding.factory": mock_embedding_factory,
-                "src.adapters.sqlite.document_repository": mock_doc_repo_module,
-                "src.adapters.sqlite.project_repository": mock_proj_repo_module,
-                "src.application.query_service": mock_qs_module,
+                "context_hub.config.profiles": mock_profiles,
+                "context_hub.infrastructure.embedding.factory": mock_embedding_factory,
+                "context_hub.adapters.sqlite.document_repository": mock_doc_repo_module,
+                "context_hub.adapters.sqlite.project_repository": mock_proj_repo_module,
+                "context_hub.application.query_service": mock_qs_module,
             },
         ), patch("typer.echo", side_effect=capture_echo):
             await _run_query(
@@ -925,7 +925,7 @@ class TestQueryAdditionalPaths:
         """_run_query should exit 1 when no projects exist and project_id is None."""
         import click
 
-        from src.cli.main import _run_query
+        from context_hub.cli.main import _run_query
 
         settings_mock = _mock_settings()
         mock_profiles = MagicMock()
@@ -947,10 +947,10 @@ class TestQueryAdditionalPaths:
         with patch.dict(
             sys.modules,
             {
-                "src.config.profiles": mock_profiles,
-                "src.infrastructure.embedding.factory": mock_embedding_factory,
-                "src.adapters.sqlite.project_repository": mock_proj_repo_module,
-                "src.adapters.sqlite.document_repository": mock_doc_repo_module,
+                "context_hub.config.profiles": mock_profiles,
+                "context_hub.infrastructure.embedding.factory": mock_embedding_factory,
+                "context_hub.adapters.sqlite.project_repository": mock_proj_repo_module,
+                "context_hub.adapters.sqlite.document_repository": mock_doc_repo_module,
             },
         ):
             with pytest.raises((click.exceptions.Exit, SystemExit)) as exc_info:
@@ -976,7 +976,7 @@ class TestInitEnvSrcNotFound:
         """init should exit 1 if the env example source file does not exist."""
         with runner.isolated_filesystem():
             # Patch _ENV_EXAMPLE_BASE to a non-existent directory
-            with patch("src.cli.main._ENV_EXAMPLE_BASE", Path("/nonexistent/path")):
+            with patch("context_hub.cli.main._ENV_EXAMPLE_BASE", Path("/nonexistent/path")):
                 result = runner.invoke(app, ["init", "--profile", "quickstart"])
         assert result.exit_code == 1
         assert "not found" in result.output.lower() or "error" in result.output.lower()

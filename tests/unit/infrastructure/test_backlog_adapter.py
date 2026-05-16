@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.infrastructure.adapters.backlog.adapter import BacklogAdapter
-from src.shared.types import (
+from context_hub.infrastructure.adapters.backlog.adapter import BacklogAdapter
+from context_hub.shared.types import (
     IssueStatus,
     IssuePriority,
     ProjectId,

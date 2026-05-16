@@ -27,15 +27,15 @@ class TestMcpConstants:
 
     def test_protocol_version_is_exported(self) -> None:
         """MCP_PROTOCOL_VERSION must be accessible from the mcp package."""
-        from src.mcp import MCP_PROTOCOL_VERSION
+        from context_hub.mcp import MCP_PROTOCOL_VERSION
 
         assert isinstance(MCP_PROTOCOL_VERSION, str)
         assert len(MCP_PROTOCOL_VERSION) > 0
 
     def test_protocol_version_matches_server(self) -> None:
         """The server must use the same protocol version as __init__ exports."""
-        from src.mcp import MCP_PROTOCOL_VERSION
-        from src.mcp.server import MCP_TOOLS
+        from context_hub.mcp import MCP_PROTOCOL_VERSION
+        from context_hub.mcp.server import MCP_TOOLS
 
         # MCP_TOOLS are defined in server.py — just verify it can be imported
         assert isinstance(MCP_TOOLS, list)
@@ -52,14 +52,14 @@ class TestMcpTools:
 
     def test_mcp_tools_is_nonempty_list(self) -> None:
         """MCP_TOOLS must be a non-empty list of tool dicts."""
-        from src.mcp.server import MCP_TOOLS
+        from context_hub.mcp.server import MCP_TOOLS
 
         assert isinstance(MCP_TOOLS, list)
         assert len(MCP_TOOLS) > 0
 
     def test_each_tool_has_required_fields(self) -> None:
         """Each tool must have 'name', 'description', and 'inputSchema'."""
-        from src.mcp.server import MCP_TOOLS
+        from context_hub.mcp.server import MCP_TOOLS
 
         for tool in MCP_TOOLS:
             assert "name" in tool, f"Tool missing 'name': {tool}"
@@ -68,14 +68,14 @@ class TestMcpTools:
 
     def test_search_context_tool_present(self) -> None:
         """search_context tool must be defined (it delegates to QueryService)."""
-        from src.mcp.server import MCP_TOOLS
+        from context_hub.mcp.server import MCP_TOOLS
 
         names = [t["name"] for t in MCP_TOOLS]
         assert "search_context" in names
 
     def test_tool_names_are_unique(self) -> None:
         """Tool names must be unique within MCP_TOOLS."""
-        from src.mcp.server import MCP_TOOLS
+        from context_hub.mcp.server import MCP_TOOLS
 
         names = [t["name"] for t in MCP_TOOLS]
         assert len(names) == len(set(names)), "Duplicate tool names found"
@@ -91,7 +91,7 @@ class TestJsonRpcHelpers:
 
     def test_ok_response_structure(self) -> None:
         """_ok_response must return a valid JSON-RPC 2.0 success object."""
-        from src.mcp.server import _ok_response
+        from context_hub.mcp.server import _ok_response
 
         resp = _ok_response(req_id=42, result={"key": "value"})
         assert resp["jsonrpc"] == "2.0"
@@ -101,7 +101,7 @@ class TestJsonRpcHelpers:
 
     def test_error_response_structure(self) -> None:
         """_error_response must return a valid JSON-RPC 2.0 error object."""
-        from src.mcp.server import _error_response
+        from context_hub.mcp.server import _error_response
 
         resp = _error_response(req_id=1, code=-32601, message="Method not found")
         assert resp["jsonrpc"] == "2.0"
@@ -112,7 +112,7 @@ class TestJsonRpcHelpers:
 
     def test_ok_response_with_none_id(self) -> None:
         """_ok_response with id=None is valid for notifications."""
-        from src.mcp.server import _ok_response
+        from context_hub.mcp.server import _ok_response
 
         resp = _ok_response(req_id=None, result={})
         assert resp["id"] is None
@@ -129,8 +129,8 @@ class TestHandleRequest:
     @pytest.mark.asyncio
     async def test_initialize_returns_protocol_version(self) -> None:
         """'initialize' method must return the correct protocol version."""
-        from src.mcp import MCP_PROTOCOL_VERSION
-        from src.mcp.server import _handle_request
+        from context_hub.mcp import MCP_PROTOCOL_VERSION
+        from context_hub.mcp.server import _handle_request
 
         request = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
         response = await _handle_request(request)
@@ -140,7 +140,7 @@ class TestHandleRequest:
     @pytest.mark.asyncio
     async def test_tools_list_returns_all_tools(self) -> None:
         """'tools/list' must return the full MCP_TOOLS list."""
-        from src.mcp.server import MCP_TOOLS, _handle_request
+        from context_hub.mcp.server import MCP_TOOLS, _handle_request
 
         request = {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
         response = await _handle_request(request)
@@ -151,7 +151,7 @@ class TestHandleRequest:
     @pytest.mark.asyncio
     async def test_unknown_method_returns_error(self) -> None:
         """Unknown method with id must return a JSON-RPC -32601 error."""
-        from src.mcp.server import _handle_request
+        from context_hub.mcp.server import _handle_request
 
         request = {"jsonrpc": "2.0", "id": 3, "method": "unknown/method", "params": {}}
         response = await _handle_request(request)
@@ -161,7 +161,7 @@ class TestHandleRequest:
     @pytest.mark.asyncio
     async def test_notification_returns_none(self) -> None:
         """Requests without 'id' (notifications) must return None."""
-        from src.mcp.server import _handle_request
+        from context_hub.mcp.server import _handle_request
 
         request = {"jsonrpc": "2.0", "method": "tools/list", "params": {}}
         response = await _handle_request(request)
@@ -170,7 +170,7 @@ class TestHandleRequest:
     @pytest.mark.asyncio
     async def test_tools_call_stub_tool_returns_result(self) -> None:
         """tools/call for a stub tool must return a content with 'stub' status."""
-        from src.mcp.server import _handle_request
+        from context_hub.mcp.server import _handle_request
 
         request = {
             "jsonrpc": "2.0",
@@ -199,7 +199,7 @@ class TestSearchContextTool:
     @pytest.mark.asyncio
     async def test_search_context_missing_args_returns_error(self) -> None:
         """search_context with empty projectId/query must return an error dict."""
-        from src.mcp.server import _tool_search_context
+        from context_hub.mcp.server import _tool_search_context
 
         result = await _tool_search_context({"projectId": "", "query": ""})
         assert "error" in result
@@ -209,7 +209,7 @@ class TestSearchContextTool:
         """search_context must clamp topK to at most 100 (F-11)."""
         import sys
 
-        from src.mcp.server import _tool_search_context
+        from context_hub.mcp.server import _tool_search_context
 
         captured_top_k: list[int] = []
 
@@ -235,10 +235,10 @@ class TestSearchContextTool:
         with patch.dict(
             sys.modules,
             {
-                "src.config.profiles": mock_profiles,
-                "src.infrastructure.embedding.factory": mock_embedding_factory,
-                "src.adapters.sqlite.document_repository": mock_doc_repo_module,
-                "src.application.query_service": mock_qs_module,
+                "context_hub.config.profiles": mock_profiles,
+                "context_hub.infrastructure.embedding.factory": mock_embedding_factory,
+                "context_hub.adapters.sqlite.document_repository": mock_doc_repo_module,
+                "context_hub.application.query_service": mock_qs_module,
             },
         ):
             await _tool_search_context(
@@ -253,7 +253,7 @@ class TestSearchContextTool:
         """search_context must clamp topK to at least 1 (F-11)."""
         import sys
 
-        from src.mcp.server import _tool_search_context
+        from context_hub.mcp.server import _tool_search_context
 
         captured_top_k: list[int] = []
 
@@ -279,10 +279,10 @@ class TestSearchContextTool:
         with patch.dict(
             sys.modules,
             {
-                "src.config.profiles": mock_profiles,
-                "src.infrastructure.embedding.factory": mock_embedding_factory,
-                "src.adapters.sqlite.document_repository": mock_doc_repo_module,
-                "src.application.query_service": mock_qs_module,
+                "context_hub.config.profiles": mock_profiles,
+                "context_hub.infrastructure.embedding.factory": mock_embedding_factory,
+                "context_hub.adapters.sqlite.document_repository": mock_doc_repo_module,
+                "context_hub.application.query_service": mock_qs_module,
             },
         ):
             await _tool_search_context(
@@ -297,7 +297,7 @@ class TestSearchContextTool:
         """search_context must delegate to QueryService.search."""
         import sys
 
-        from src.mcp.server import _tool_search_context
+        from context_hub.mcp.server import _tool_search_context
 
         mock_result = MagicMock()
         mock_result.score = 0.9
@@ -328,10 +328,10 @@ class TestSearchContextTool:
         with patch.dict(
             sys.modules,
             {
-                "src.config.profiles": mock_profiles,
-                "src.infrastructure.embedding.factory": mock_embedding_factory,
-                "src.adapters.sqlite.document_repository": mock_doc_repo_module,
-                "src.application.query_service": mock_qs_module,
+                "context_hub.config.profiles": mock_profiles,
+                "context_hub.infrastructure.embedding.factory": mock_embedding_factory,
+                "context_hub.adapters.sqlite.document_repository": mock_doc_repo_module,
+                "context_hub.application.query_service": mock_qs_module,
             },
         ):
             result = await _tool_search_context(
@@ -351,12 +351,12 @@ class TestSearchContextTool:
         """
         import sys
 
-        from src.mcp.server import _tool_search_context
+        from context_hub.mcp.server import _tool_search_context
 
         mock_profiles = MagicMock()
         mock_profiles.get_profile_settings = MagicMock(side_effect=RuntimeError("DB down"))
 
-        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}):
+        with patch.dict(sys.modules, {"context_hub.config.profiles": mock_profiles}):
             result = await _tool_search_context(
                 {"projectId": "proj-1", "query": "test"}
             )
@@ -380,8 +380,8 @@ class TestMcpVersionEndpoint:
         """GET /mcp/version must return the MCP protocol version."""
         from fastapi.testclient import TestClient
 
-        from src.main import app
-        from src.mcp import MCP_PROTOCOL_VERSION
+        from context_hub.main import app
+        from context_hub.mcp import MCP_PROTOCOL_VERSION
 
         with TestClient(app) as client:
             response = client.get("/mcp/version")
@@ -395,7 +395,7 @@ class TestMcpVersionEndpoint:
         """The /mcp/version endpoint must appear in the OpenAPI schema."""
         from fastapi.testclient import TestClient
 
-        from src.main import app
+        from context_hub.main import app
 
         with TestClient(app) as client:
             response = client.get("/openapi.json")

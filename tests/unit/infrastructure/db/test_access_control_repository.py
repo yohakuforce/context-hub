@@ -10,8 +10,8 @@ import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.domain.access_control.entities import Consumer, HashedApiKey, Permission
-from src.shared.types import ConsumerId, PermissionId, ProjectId, Scope
+from context_hub.domain.access_control.entities import Consumer, HashedApiKey, Permission
+from context_hub.shared.types import ConsumerId, PermissionId, ProjectId, Scope
 
 
 class TestConsumerDomainLogic:

@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.infrastructure.llm.base import LLMMessage
-from src.infrastructure.llm.claude_code_adapter import (
+from context_hub.infrastructure.llm.base import LLMMessage
+from context_hub.infrastructure.llm.claude_code_adapter import (
     ClaudeCodeAdapter,
     _build_prompt,
     _run_claude_cli,

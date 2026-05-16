@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Namespace refactor (T-20260516-007a)**: renamed top-level package `src/` → `context_hub/`.
+  All import paths updated from `from src.X` to `from context_hub.X`. Entry point changed from
+  `src.cli.main:app` to `context_hub.cli.main:main`. No logic changes; purely mechanical rename.
+
 ### Added
 - `--yes` / `-y` flag for `migrate` command to skip production confirmation prompt
 

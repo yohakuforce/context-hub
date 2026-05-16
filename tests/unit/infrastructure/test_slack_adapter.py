@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.infrastructure.adapters.slack.adapter import SlackAdapter
-from src.shared.types import ProjectId, SourceType, SyncCursor
+from context_hub.infrastructure.adapters.slack.adapter import SlackAdapter
+from context_hub.shared.types import ProjectId, SourceType, SyncCursor
 
 
 PROJECT_ID = ProjectId("test-project-slack")

@@ -7,15 +7,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.domain.document.entities import Document
-from src.infrastructure.db.document_repository import (
+from context_hub.domain.document.entities import Document
+from context_hub.infrastructure.db.document_repository import (
     _domain_to_values,
     _format_vector,
     _row_to_domain,
     PostgresDocumentRepository,
 )
-from src.infrastructure.db.models import DocumentRow
-from src.shared.types import (
+from context_hub.infrastructure.db.models import DocumentRow
+from context_hub.shared.types import (
     DocumentId,
     EmbeddingVector,
     ProjectId,

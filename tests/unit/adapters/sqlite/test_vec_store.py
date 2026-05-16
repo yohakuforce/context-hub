@@ -22,8 +22,8 @@ import numpy as np
 import pytest
 import sqlite_vec
 
-from src.adapters.sqlite.vec_store import _EMBEDDING_DIM, _MAX_K, SqliteVecStore
-from src.core.vectorstore import HealthState, VectorStore
+from context_hub.adapters.sqlite.vec_store import _EMBEDDING_DIM, _MAX_K, SqliteVecStore
+from context_hub.core.vectorstore import HealthState, VectorStore
 
 
 def _make_vec(dim: int = _EMBEDDING_DIM, fill: float = 0.0) -> np.ndarray:

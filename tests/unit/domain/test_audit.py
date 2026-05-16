@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from datetime import datetime
 
-from src.domain.audit.entities import AuditLog, OperationType
-from src.shared.types import AuditLogId, ConsumerId, ProjectId
+from context_hub.domain.audit.entities import AuditLog, OperationType
+from context_hub.shared.types import AuditLogId, ConsumerId, ProjectId
 
 
 class TestAuditLog:

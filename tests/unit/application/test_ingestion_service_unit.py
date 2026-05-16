@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.application.ingestion_service import _batched, IngestionService
-from src.infrastructure.embedding.mock_adapter import MockEmbeddingAdapter
+from context_hub.application.ingestion_service import _batched, IngestionService
+from context_hub.infrastructure.embedding.mock_adapter import MockEmbeddingAdapter
 
 
 class TestBatched:

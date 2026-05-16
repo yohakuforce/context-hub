@@ -9,11 +9,11 @@ from pathlib import Path
 import pytest
 import sqlite_vec
 
-from src.adapters.sqlite.issue_repository import SqliteIssueRepository
-from src.adapters.sqlite.project_repository import SqliteProjectRepository
-from src.domain.issue.entities import Issue
-from src.domain.project.entities import Project
-from src.shared.types import (
+from context_hub.adapters.sqlite.issue_repository import SqliteIssueRepository
+from context_hub.adapters.sqlite.project_repository import SqliteProjectRepository
+from context_hub.domain.issue.entities import Issue
+from context_hub.domain.project.entities import Project
+from context_hub.shared.types import (
     IssueId,
     IssuePriority,
     IssueStatus,
@@ -237,7 +237,7 @@ class TestSqliteIssueRepository:
         self, db_path: str, project_id: ProjectId
     ) -> None:
         """find_by_project with assignee_id filter."""
-        from src.shared.types import MemberRef
+        from context_hub.shared.types import MemberRef
         repo = SqliteIssueRepository(db_path)
         assigned = _make_issue(project_id, external_id="assigned-1")
         # Manually set assignee

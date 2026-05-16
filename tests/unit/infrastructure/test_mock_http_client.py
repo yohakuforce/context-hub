@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from src.infrastructure.adapters.mock_http_client import MockHttpClient, MockHttpResponse
+from context_hub.infrastructure.adapters.mock_http_client import MockHttpClient, MockHttpResponse
 
 
 class TestMockHttpResponse:

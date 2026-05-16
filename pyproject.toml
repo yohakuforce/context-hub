@@ -76,7 +76,7 @@ Documentation = "https://github.com/yohakuforce/context-hub#readme"
 Issues = "https://github.com/yohakuforce/context-hub/issues"
 
 [project.scripts]
-context-hub = "src.cli.main:app"
+context-hub = "context_hub.cli.main:main"
 
 [project.optional-dependencies]
 # BGE-M3 local embedding — heavy (~2.3 GB model download on first use).
@@ -113,25 +113,26 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["context_hub"]
 
 [tool.hatch.build.targets.editable]
-packages = ["src"]
+packages = ["context_hub"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--cov=src --cov-report=term-missing --cov-fail-under=80"
+addopts = "--cov=context_hub --cov-report=term-missing --cov-fail-under=80"
 markers = [
     "local_postgres: requires a local Postgres instance; not run in CI by default",
 ]
 
 [tool.coverage.run]
+source = ["context_hub"]
 omit = [
-    "src/infrastructure/llm/claude_adapter.py",
-    "src/infrastructure/llm/openai_adapter.py",
-    "src/infrastructure/db/access_control_repository.py",
-    "src/infrastructure/db/audit_log_repository.py",
+    "context_hub/infrastructure/llm/claude_adapter.py",
+    "context_hub/infrastructure/llm/openai_adapter.py",
+    "context_hub/infrastructure/db/access_control_repository.py",
+    "context_hub/infrastructure/db/audit_log_repository.py",
 ]
 
 [tool.ruff]

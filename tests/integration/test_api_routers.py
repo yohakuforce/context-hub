@@ -12,8 +12,8 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient, ASGITransport
 
-from src.main import create_app
-from src.api.dependencies import (
+from context_hub.main import create_app
+from context_hub.api.dependencies import (
     get_document_repo,
     get_embedding,
     get_issue_repo,
@@ -21,13 +21,13 @@ from src.api.dependencies import (
     get_project_repo,
     get_query_service,
 )
-from src.application.query_service import QueryService
-from src.domain.document.entities import Document
-from src.domain.ingestion.entities import IngestionJob
-from src.domain.issue.entities import Issue
-from src.domain.project.entities import Project, SourceConfig
-from src.infrastructure.embedding.mock_adapter import MockEmbeddingAdapter
-from src.shared.types import (
+from context_hub.application.query_service import QueryService
+from context_hub.domain.document.entities import Document
+from context_hub.domain.ingestion.entities import IngestionJob
+from context_hub.domain.issue.entities import Issue
+from context_hub.domain.project.entities import Project, SourceConfig
+from context_hub.infrastructure.embedding.mock_adapter import MockEmbeddingAdapter
+from context_hub.shared.types import (
     IngestionJobId,
     IssueStatus,
     JobStatus,
@@ -135,7 +135,7 @@ def app(repos):
     )
 
     # Patch auth module so DEV_API_KEY == _TEST_API_KEY for integration tests.
-    import src.api.middleware.auth as _auth_mod
+    import context_hub.api.middleware.auth as _auth_mod
     _auth_mod._DEV_API_KEY = _TEST_API_KEY  # noqa: SLF001
     _auth_mod._APP_ENV = "development"  # noqa: SLF001
 

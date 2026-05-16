@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.profiles import (
+from context_hub.profiles import (
     BackendProfile,
     PRODUCTION_PROFILE,
     QUICKSTART_PROFILE,
@@ -61,32 +61,32 @@ class TestSQLiteProfiles:
     """Quickstart / personal profiles now return SQLite repositories (Phase 2)."""
 
     def test_quickstart_project_repo_returns_repo(self) -> None:
-        from src.adapters.sqlite.project_repository import SqliteProjectRepository
+        from context_hub.adapters.sqlite.project_repository import SqliteProjectRepository
         repo = QUICKSTART_PROFILE.make_project_repo(None)
         assert isinstance(repo, SqliteProjectRepository)
 
     def test_quickstart_document_repo_returns_repo(self) -> None:
-        from src.adapters.sqlite.document_repository import SqliteDocumentRepository
+        from context_hub.adapters.sqlite.document_repository import SqliteDocumentRepository
         repo = QUICKSTART_PROFILE.make_document_repo(None)
         assert isinstance(repo, SqliteDocumentRepository)
 
     def test_quickstart_issue_repo_returns_repo(self) -> None:
-        from src.adapters.sqlite.issue_repository import SqliteIssueRepository
+        from context_hub.adapters.sqlite.issue_repository import SqliteIssueRepository
         repo = QUICKSTART_PROFILE.make_issue_repo(None)
         assert isinstance(repo, SqliteIssueRepository)
 
     def test_quickstart_job_repo_returns_repo(self) -> None:
-        from src.adapters.sqlite.ingestion_job_repository import SqliteIngestionJobRepository
+        from context_hub.adapters.sqlite.ingestion_job_repository import SqliteIngestionJobRepository
         repo = QUICKSTART_PROFILE.make_job_repo(None)
         assert isinstance(repo, SqliteIngestionJobRepository)
 
     def test_personal_project_repo_returns_repo(self) -> None:
-        from src.adapters.sqlite.project_repository import SqliteProjectRepository
+        from context_hub.adapters.sqlite.project_repository import SqliteProjectRepository
         repo = PERSONAL_PROFILE.make_project_repo(None)
         assert isinstance(repo, SqliteProjectRepository)
 
     def test_personal_document_repo_returns_repo(self) -> None:
-        from src.adapters.sqlite.document_repository import SqliteDocumentRepository
+        from context_hub.adapters.sqlite.document_repository import SqliteDocumentRepository
         repo = PERSONAL_PROFILE.make_document_repo(None)
         assert isinstance(repo, SqliteDocumentRepository)
 

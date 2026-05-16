@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.vectorstore import ScoredId
-from src.services.hybrid import reciprocal_rank_fusion
+from context_hub.core.vectorstore import ScoredId
+from context_hub.services.hybrid import reciprocal_rank_fusion
 
 
 # ---------------------------------------------------------------------------

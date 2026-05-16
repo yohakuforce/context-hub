@@ -38,7 +38,7 @@ print('BGE-M3 model cached successfully')" || \
     echo "BGE-M3 pre-download skipped (will download at first run)"
 
 # Copy application source
-COPY src/ ./src/
+COPY context_hub/ ./context_hub/
 COPY migrations/ ./migrations/
 COPY alembic.ini ./
 
@@ -47,8 +47,8 @@ RUN mkdir -p /app/data/meetings /app/data/documents
 
 # Ensure line endings are LF even when built on Windows
 # (source files should already be LF via .gitattributes, but belt-and-suspenders)
-RUN find /app/src -name "*.py" -exec sed -i 's/\r//' {} \;
+RUN find /app/context_hub -name "*.py" -exec sed -i 's/\r//' {} \;
 
 EXPOSE 8000
 
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "context_hub.main:app", "--host", "0.0.0.0", "--port", "8000"]

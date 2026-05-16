@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from src.core.vectorstore import (
+from context_hub.core.vectorstore import (
     HealthState,
     HealthStatus,
     MetaFilter,

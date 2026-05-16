@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.infrastructure.adapters.redmine.adapter import RedmineAdapter
-from src.shared.types import (
+from context_hub.infrastructure.adapters.redmine.adapter import RedmineAdapter
+from context_hub.shared.types import (
     IssueStatus,
     IssuePriority,
     ProjectId,

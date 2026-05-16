@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from src.adapters.sqlite.migration_runner import SqliteMigrationRunner
+from context_hub.adapters.sqlite.migration_runner import SqliteMigrationRunner
 
 
 @pytest.mark.asyncio
@@ -111,6 +111,6 @@ class TestSqliteMigrationRunner:
     async def test_satisfies_migration_runner_protocol(
         self, tmp_path: Path
     ) -> None:
-        from src.core.migration import MigrationRunner
+        from context_hub.core.migration import MigrationRunner
         runner = SqliteMigrationRunner(db_path=str(tmp_path / "proto.db"))
         assert isinstance(runner, MigrationRunner)

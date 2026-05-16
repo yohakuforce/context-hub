@@ -21,30 +21,30 @@ class TestGetSchedulerStoreMemory:
         with patch.dict(os.environ, {}, clear=False):
             env = {k: v for k, v in os.environ.items() if k != "SCHEDULER_BACKEND"}
             with patch.dict(os.environ, env, clear=True):
-                from src.adapters.scheduler.factory import get_scheduler_store
-                from src.adapters.scheduler.memory_store import MemorySchedulerStore
+                from context_hub.adapters.scheduler.factory import get_scheduler_store
+                from context_hub.adapters.scheduler.memory_store import MemorySchedulerStore
 
                 store = get_scheduler_store()
         assert isinstance(store, MemorySchedulerStore)
 
     def test_returns_memory_store_when_env_is_memory(self) -> None:
         with patch.dict(os.environ, {"SCHEDULER_BACKEND": "memory"}):
-            from src.adapters.scheduler.factory import get_scheduler_store
-            from src.adapters.scheduler.memory_store import MemorySchedulerStore
+            from context_hub.adapters.scheduler.factory import get_scheduler_store
+            from context_hub.adapters.scheduler.memory_store import MemorySchedulerStore
 
             store = get_scheduler_store()
         assert isinstance(store, MemorySchedulerStore)
 
     def test_explicit_backend_arg_overrides_env(self) -> None:
         with patch.dict(os.environ, {"SCHEDULER_BACKEND": "postgres"}):
-            from src.adapters.scheduler.factory import get_scheduler_store
-            from src.adapters.scheduler.memory_store import MemorySchedulerStore
+            from context_hub.adapters.scheduler.factory import get_scheduler_store
+            from context_hub.adapters.scheduler.memory_store import MemorySchedulerStore
 
             store = get_scheduler_store(backend="memory")
         assert isinstance(store, MemorySchedulerStore)
 
     def test_unknown_backend_raises_value_error(self) -> None:
-        from src.adapters.scheduler.factory import get_scheduler_store
+        from context_hub.adapters.scheduler.factory import get_scheduler_store
 
         with pytest.raises(ValueError, match="Unknown SCHEDULER_BACKEND"):
             get_scheduler_store(backend="redis")
@@ -55,8 +55,8 @@ class TestGetSchedulerStoreSQLite:
 
     def test_returns_sqlite_store(self) -> None:
         with patch.dict(os.environ, {"SCHEDULER_BACKEND": "sqlite"}):
-            from src.adapters.scheduler.factory import get_scheduler_store
-            from src.adapters.scheduler.sqlite_store import SQLiteSchedulerStore
+            from context_hub.adapters.scheduler.factory import get_scheduler_store
+            from context_hub.adapters.scheduler.sqlite_store import SQLiteSchedulerStore
 
             store = get_scheduler_store()
         assert isinstance(store, SQLiteSchedulerStore)
@@ -66,8 +66,8 @@ class TestGetSchedulerStoreSQLite:
         custom_path = "/tmp/test_scheduler_h3.db"
         env = {"SCHEDULER_BACKEND": "sqlite", "SCHEDULER_SQLITE_DB": custom_path}
         with patch.dict(os.environ, env):
-            from src.adapters.scheduler.factory import get_scheduler_store
-            from src.adapters.scheduler.sqlite_store import SQLiteSchedulerStore
+            from context_hub.adapters.scheduler.factory import get_scheduler_store
+            from context_hub.adapters.scheduler.sqlite_store import SQLiteSchedulerStore
 
             store = get_scheduler_store()
         assert isinstance(store, SQLiteSchedulerStore)
@@ -80,8 +80,8 @@ class TestGetSchedulerStoreSQLite:
             "SCHEDULER_SQLITE_DB": "/tmp/from_env.db",
         }
         with patch.dict(os.environ, env):
-            from src.adapters.scheduler.factory import get_scheduler_store
-            from src.adapters.scheduler.sqlite_store import SQLiteSchedulerStore
+            from context_hub.adapters.scheduler.factory import get_scheduler_store
+            from context_hub.adapters.scheduler.sqlite_store import SQLiteSchedulerStore
 
             store = get_scheduler_store(sqlite_db_path="/tmp/from_arg.db")
         assert isinstance(store, SQLiteSchedulerStore)
@@ -93,8 +93,8 @@ class TestGetSchedulerStoreSQLite:
         env_clean = {k: v for k, v in os.environ.items() if k not in ("SCHEDULER_SQLITE_DB",)}
         env_clean.update(env)
         with patch.dict(os.environ, env_clean, clear=True):
-            from src.adapters.scheduler.factory import get_scheduler_store
-            from src.adapters.scheduler.sqlite_store import SQLiteSchedulerStore
+            from context_hub.adapters.scheduler.factory import get_scheduler_store
+            from context_hub.adapters.scheduler.sqlite_store import SQLiteSchedulerStore
 
             store = get_scheduler_store()
         assert isinstance(store, SQLiteSchedulerStore)
@@ -111,10 +111,10 @@ class TestGetSchedulerStorePostgres:
         """
         with patch.dict(os.environ, env):
             with patch(
-                "src.adapters.scheduler.postgres_store.PostgresSchedulerStore.__init__",
+                "context_hub.adapters.scheduler.postgres_store.PostgresSchedulerStore.__init__",
                 return_value=None,
             ) as mock_init:
-                from src.adapters.scheduler.factory import get_scheduler_store
+                from context_hub.adapters.scheduler.factory import get_scheduler_store
                 get_scheduler_store(backend="postgres")
                 return mock_init
 
@@ -130,10 +130,10 @@ class TestGetSchedulerStorePostgres:
 
         with patch.dict(os.environ, clean_env, clear=True):
             with patch(
-                "src.adapters.scheduler.postgres_store.PostgresSchedulerStore.__init__",
+                "context_hub.adapters.scheduler.postgres_store.PostgresSchedulerStore.__init__",
                 return_value=None,
             ) as mock_init:
-                from src.adapters.scheduler.factory import get_scheduler_store
+                from context_hub.adapters.scheduler.factory import get_scheduler_store
                 get_scheduler_store(backend="postgres")
 
         # _normalise_url converts asyncpg → psycopg2
@@ -149,10 +149,10 @@ class TestGetSchedulerStorePostgres:
         }
         with patch.dict(os.environ, env):
             with patch(
-                "src.adapters.scheduler.postgres_store.PostgresSchedulerStore.__init__",
+                "context_hub.adapters.scheduler.postgres_store.PostgresSchedulerStore.__init__",
                 return_value=None,
             ) as mock_init:
-                from src.adapters.scheduler.factory import get_scheduler_store
+                from context_hub.adapters.scheduler.factory import get_scheduler_store
                 get_scheduler_store(backend="postgres")
 
         mock_init.assert_called_once_with(
@@ -167,10 +167,10 @@ class TestGetSchedulerStorePostgres:
         }
         with patch.dict(os.environ, env):
             with patch(
-                "src.adapters.scheduler.postgres_store.PostgresSchedulerStore.__init__",
+                "context_hub.adapters.scheduler.postgres_store.PostgresSchedulerStore.__init__",
                 return_value=None,
             ) as mock_init:
-                from src.adapters.scheduler.factory import get_scheduler_store
+                from context_hub.adapters.scheduler.factory import get_scheduler_store
                 get_scheduler_store(
                     backend="postgres",
                     database_url="postgresql+psycopg2://explicit:pass@explicit-host:5432/db",
@@ -186,10 +186,10 @@ class TestGetSchedulerStorePostgres:
                      if k not in ("DATABASE_URL", "SCHEDULER_DATABASE_URL")}
         with patch.dict(os.environ, clean_env, clear=True):
             with patch(
-                "src.adapters.scheduler.postgres_store.PostgresSchedulerStore.__init__",
+                "context_hub.adapters.scheduler.postgres_store.PostgresSchedulerStore.__init__",
                 return_value=None,
             ) as mock_init:
-                from src.adapters.scheduler.factory import get_scheduler_store
+                from context_hub.adapters.scheduler.factory import get_scheduler_store
                 get_scheduler_store(backend="postgres")
 
         mock_init.assert_called_once_with(

@@ -3,8 +3,8 @@
 import pytest
 from datetime import datetime
 
-from src.domain.project.entities import Project, SourceConfig, EncryptedCredentials
-from src.shared.types import SourceType
+from context_hub.domain.project.entities import Project, SourceConfig, EncryptedCredentials
+from context_hub.shared.types import SourceType
 
 
 class TestProjectCreate:

@@ -21,7 +21,7 @@ class TestLifespanWithMemoryBackend:
     def test_app_starts_and_health_returns_200(self) -> None:
         """App must start (lifespan must not raise) and respond to /health."""
         with patch.dict(os.environ, {"SCHEDULER_BACKEND": "memory"}):
-            from src.main import create_app
+            from context_hub.main import create_app
 
             test_app = create_app()
             with TestClient(test_app) as client:
@@ -31,7 +31,7 @@ class TestLifespanWithMemoryBackend:
     def test_health_json_has_status_ok(self) -> None:
         """Health endpoint must return {"status": "ok"} during lifespan."""
         with patch.dict(os.environ, {"SCHEDULER_BACKEND": "memory"}):
-            from src.main import create_app
+            from context_hub.main import create_app
 
             test_app = create_app()
             with TestClient(test_app) as client:
@@ -45,7 +45,7 @@ class TestLifespanWithMemoryBackend:
             "DATABASE_URL": "sqlite+aiosqlite:///./data/context_hub.db",
         }
         with patch.dict(os.environ, env_overrides):
-            from src.main import create_app
+            from context_hub.main import create_app
 
             test_app = create_app()
             # If lifespan raises, TestClient.__enter__ will propagate the error.
@@ -56,7 +56,7 @@ class TestLifespanWithMemoryBackend:
     def test_multiple_requests_during_lifespan(self) -> None:
         """Scheduler must remain active for multiple requests within one lifespan."""
         with patch.dict(os.environ, {"SCHEDULER_BACKEND": "memory"}):
-            from src.main import create_app
+            from context_hub.main import create_app
 
             test_app = create_app()
             with TestClient(test_app) as client:
@@ -72,7 +72,7 @@ class TestSchedulerBackendEnvVar:
     def test_memory_backend_env_var_accepted(self) -> None:
         """SCHEDULER_BACKEND=memory must not cause an error during startup."""
         with patch.dict(os.environ, {"SCHEDULER_BACKEND": "memory"}):
-            from src.main import create_app
+            from context_hub.main import create_app
 
             app = create_app()
             with TestClient(app) as client:
@@ -90,7 +90,7 @@ class TestLifespanShutdownTryFinally:
 
         from fastapi import FastAPI
 
-        from src.main import lifespan
+        from context_hub.main import lifespan
 
         mock_scheduler = MagicMock()
         mock_scheduler.shutdown.side_effect = RuntimeError("scheduler exploded")
@@ -104,7 +104,7 @@ class TestLifespanShutdownTryFinally:
         # Patch the local imports inside lifespan
         with (
             patch(
-                "src.adapters.scheduler.factory.get_scheduler_store",
+                "context_hub.adapters.scheduler.factory.get_scheduler_store",
                 return_value=mock_store,
             ),
             patch(
@@ -129,7 +129,7 @@ class TestLifespanShutdownTryFinally:
 
         from fastapi import FastAPI
 
-        from src.main import lifespan
+        from context_hub.main import lifespan
 
         mock_scheduler = MagicMock()
         mock_scheduler.shutdown = MagicMock()  # does not raise
@@ -142,7 +142,7 @@ class TestLifespanShutdownTryFinally:
 
         with (
             patch(
-                "src.adapters.scheduler.factory.get_scheduler_store",
+                "context_hub.adapters.scheduler.factory.get_scheduler_store",
                 return_value=mock_store,
             ),
             patch(

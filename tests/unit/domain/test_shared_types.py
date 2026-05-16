@@ -3,7 +3,7 @@
 import pytest
 from datetime import datetime
 
-from src.shared.types import (
+from context_hub.shared.types import (
     EmbeddingVector,
     RawContent,
     StructuredContent,

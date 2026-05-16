@@ -9,11 +9,11 @@ from pathlib import Path
 import pytest
 import sqlite_vec
 
-from src.adapters.sqlite.ingestion_job_repository import SqliteIngestionJobRepository
-from src.adapters.sqlite.project_repository import SqliteProjectRepository
-from src.domain.ingestion.entities import IngestionJob
-from src.domain.project.entities import Project
-from src.shared.types import (
+from context_hub.adapters.sqlite.ingestion_job_repository import SqliteIngestionJobRepository
+from context_hub.adapters.sqlite.project_repository import SqliteProjectRepository
+from context_hub.domain.ingestion.entities import IngestionJob
+from context_hub.domain.project.entities import Project
+from context_hub.shared.types import (
     IngestionJobId,
     JobStatus,
     ProjectId,

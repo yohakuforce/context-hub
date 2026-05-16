@@ -7,10 +7,10 @@ from datetime import datetime
 from typing import Optional
 from unittest.mock import AsyncMock
 
-from src.application.query_service import QueryResult, QueryService
-from src.domain.document.entities import Document
-from src.infrastructure.embedding.mock_adapter import MockEmbeddingAdapter
-from src.shared.types import (
+from context_hub.application.query_service import QueryResult, QueryService
+from context_hub.domain.document.entities import Document
+from context_hub.infrastructure.embedding.mock_adapter import MockEmbeddingAdapter
+from context_hub.shared.types import (
     DocumentId,
     EmbeddingVector,
     ProjectId,
@@ -71,7 +71,7 @@ class TestQueryResult:
         assert result.snippet == "short text"
 
     def test_title_uses_summary_if_available(self):
-        from src.shared.types import StructuredContent
+        from context_hub.shared.types import StructuredContent
         doc = _make_document("some raw text")
         structured = StructuredContent(
             summary="Structured summary title",

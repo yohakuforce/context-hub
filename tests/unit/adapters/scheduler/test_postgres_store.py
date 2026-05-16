@@ -6,7 +6,7 @@ postgresql+psycopg2://.
 
 from __future__ import annotations
 
-from src.adapters.scheduler.postgres_store import _normalise_url
+from context_hub.adapters.scheduler.postgres_store import _normalise_url
 
 
 class TestNormaliseUrl:
