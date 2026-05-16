@@ -41,8 +41,8 @@ class SqliteFts5Search:
     Example::
 
         fts = SqliteFts5Search(db_path="context_hub.db")
-        await fts.index("doc-1", "Hello world", lang="en")
-        results = await fts.search("hello", k=5)
+        await fts.index("doc-1", "Hello world", lang="en", project_id="proj-abc")
+        results = await fts.search("hello", k=5, project_id="proj-abc")
     """
 
     def __init__(self, db_path: str) -> None:
