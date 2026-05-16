@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yohakuforce-context-hub"
-version = "0.1.0a2"
+version = "0.1.0a3"
 description = "Context collection and storage foundation for AI projects (MCP-native)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -62,6 +62,15 @@ dependencies = [
     # SQLite vector search (sqlite profile / quickstart / personal)
     # sqlite-vec provides the vec0 virtual table extension.
     "sqlite-vec>=0.1.1",
+
+    # numpy: required by the SQLite vector store and the embedding adapters
+    # (core code path, not optional). Previously came in transitively through
+    # FlagEmbedding, which broke vanilla installs without extras.
+    "numpy>=1.26",
+
+    # aiosqlite: async driver for SQLAlchemy when DATABASE_URL uses
+    # sqlite+aiosqlite:// (default for quickstart/personal profiles).
+    "aiosqlite>=0.20.0",
 
     # Utilities (OpenAI + Anthropic SDK intentionally excluded per 2026-05-15 policy)
     "python-dotenv>=1.0.0",

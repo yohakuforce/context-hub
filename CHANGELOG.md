@@ -16,9 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Packaging fix (0.1.0a2)**: relocated `examples/env/.env.example.{quickstart,personal,production}`
   to `context_hub/_env_examples/` so they ship inside the wheel. Without this, `context-hub init`
   failed in installed packages with "env example file not found".
+- **Lazy DB engine (0.1.0a3)**: `context_hub.infrastructure.db.session` now creates the
+  SQLAlchemy async engine on first access (PEP 562 `__getattr__`), instead of at import
+  time. Without this, importing the FastAPI app from a SQLite-profile install eagerly
+  loaded the asyncpg dialect and crashed when asyncpg was not installed.
 
 ### Added
 - `--yes` / `-y` flag for `migrate` command to skip production confirmation prompt
+- Direct dependency on `numpy>=1.26` (was previously a transitive of `[embedding]` extras
+  but is used by the core SQLite vector store on every install).
+- Direct dependency on `aiosqlite>=0.20.0` (required for the default `sqlite+aiosqlite://`
+  DATABASE_URL).
 
 ### Fixed
 - mypy `no-any-return` error in `context_hub.adapters.sqlite.vec_store._to_blob`.
