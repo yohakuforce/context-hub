@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yohakuforce-context-hub"
-version = "0.1.0a3"
+version = "0.1.0a4"
 description = "Context collection and storage foundation for AI projects (MCP-native)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -44,7 +44,9 @@ dependencies = [
     "pydantic-settings>=2.0.0",
 
     # Database (core — SQLite works out of the box)
-    "sqlalchemy>=2.0.0",
+    # The [asyncio] extra pulls in `greenlet`, required by SQLAlchemy's
+    # async engine even for SQLite+aiosqlite installs.
+    "sqlalchemy[asyncio]>=2.0.0",
     "alembic>=1.13.0",
 
     # HTTP client (Backlog / Redmine)
@@ -119,6 +121,10 @@ dev = [
     "factory-boy>=3.3.0",
     "mypy>=1.10.0",
     "ruff>=0.4.0",
+    # postgres-backend models and tests are collected by default, so we need
+    # the [postgres] runtime deps available in CI too.
+    "asyncpg>=0.29.0",
+    "pgvector>=0.3.0",
 ]
 
 [tool.hatch.build.targets.wheel]

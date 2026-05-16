@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   but is used by the core SQLite vector store on every install).
 - Direct dependency on `aiosqlite>=0.20.0` (required for the default `sqlite+aiosqlite://`
   DATABASE_URL).
+- Switched `sqlalchemy` to `sqlalchemy[asyncio]` (0.1.0a4) so `greenlet` is pulled in. Without it,
+  importing `sqlalchemy.ext.asyncio` raises `ImportError` and `context-hub serve` fails to start.
+- Added `asyncpg` and `pgvector` to `[dev]` extras so CI can collect the postgres-backend
+  test modules (collection imports `context_hub.infrastructure.db.models`, which uses
+  `pgvector.sqlalchemy.Vector` as a column type).
 
 ### Fixed
 - mypy `no-any-return` error in `context_hub.adapters.sqlite.vec_store._to_blob`.
