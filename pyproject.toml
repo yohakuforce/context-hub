@@ -51,6 +51,11 @@ dependencies = [
     # MCP
     "mcp>=1.0.0",
 
+    # SQLite vector search (sqlite profile / quickstart / personal)
+    # sqlite-vec provides the vec0 virtual table extension.
+    # Install the native extension wheel with: pip install sqlite-vec
+    "sqlite-vec>=0.1.1",
+
     # Utilities (OpenAI + Anthropic SDK intentionally excluded per 2026-05-15 policy)
     "python-dotenv>=1.0.0",
     "structlog>=23.0.0",

@@ -2,8 +2,8 @@
 
 Three built-in profiles are provided:
 
-- quickstart  : SQLite + mock embedding (zero external dependencies, local dev)
-- personal    : SQLite + real BGE-M3 embedding (single-user, no Postgres needed)
+- quickstart  : SQLite + in-memory DB (zero external dependencies, local dev)
+- personal    : SQLite + persistent file DB (single-user, no Postgres needed)
 - production  : PostgreSQL + pgvector + BGE-M3 embedding (full feature set)
 
 Usage (application entrypoint)::
@@ -15,17 +15,20 @@ The BackendProfile dataclass is intentionally simple: it holds only factory
 functions so that the rest of the application depends on Protocols, not on
 concrete classes.
 
-Phase 1 note:
-    The SQLite factories are stubs — they raise NotImplementedError until
-    T-20260516-004 implements the SQLite adapter.  This allows the DI wiring
-    to be tested end-to-end with the Postgres profile without blocking the
-    OSS launch.
+SQLite profiles use a file path for the database.  The default paths are:
+
+- quickstart : ":memory:" (ephemeral, for local testing)
+- personal   : "~/.context_hub/context_hub.db" (persistent single-user DB)
+
+Override the path via the ``CH_SQLITE_DB`` environment variable.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Callable
+import os
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +36,24 @@ from src.domain.document.repository import DocumentRepository
 from src.domain.ingestion.repository import IngestionJobRepository
 from src.domain.issue.repository import IssueRepository
 from src.domain.project.repository import ProjectRepository
+
+# ---------------------------------------------------------------------------
+# SQLite DB path resolution
+# ---------------------------------------------------------------------------
+
+_DEFAULT_PERSONAL_DB: Path = Path.home() / ".context_hub" / "context_hub.db"
+
+
+def _sqlite_db_path(default: str) -> str:
+    """Resolve the SQLite database path from the environment or use *default*.
+
+    Args:
+        default: Fallback path string when ``CH_SQLITE_DB`` is not set.
+
+    Returns:
+        Resolved database path string.
+    """
+    return os.environ.get("CH_SQLITE_DB", default)
 
 
 # ---------------------------------------------------------------------------
@@ -91,15 +112,86 @@ def _postgres_job_repo(session: AsyncSession | None) -> IngestionJobRepository:
 
 
 # ---------------------------------------------------------------------------
-# SQLite profile factories (Phase 2 stubs)
+# SQLite profile factories (Phase 2 — T-20260516-004)
 # ---------------------------------------------------------------------------
 
 
-def _sqlite_stub(_session: AsyncSession | None) -> None:  # type: ignore[return]
-    raise NotImplementedError(
-        "SQLite backend is not yet implemented. "
-        "It will be available in T-20260516-004 (Phase 2). "
-        "Use profile='production' for a fully functional backend."
+def _sqlite_project_repo(db_path: str) -> Callable[[AsyncSession | None], ProjectRepository]:
+    """Return a factory closure for SqliteProjectRepository.
+
+    Args:
+        db_path: SQLite database file path.
+
+    Returns:
+        Factory function compatible with BackendProfile.make_project_repo.
+    """
+    def factory(_session: AsyncSession | None) -> ProjectRepository:
+        from src.adapters.sqlite.project_repository import SqliteProjectRepository
+        return SqliteProjectRepository(db_path)
+    return factory
+
+
+def _sqlite_document_repo(db_path: str) -> Callable[[AsyncSession | None], DocumentRepository]:
+    """Return a factory closure for SqliteDocumentRepository.
+
+    Args:
+        db_path: SQLite database file path.
+
+    Returns:
+        Factory function compatible with BackendProfile.make_document_repo.
+    """
+    def factory(_session: AsyncSession | None) -> DocumentRepository:
+        from src.adapters.sqlite.document_repository import SqliteDocumentRepository
+        return SqliteDocumentRepository(db_path)
+    return factory
+
+
+def _sqlite_issue_repo(db_path: str) -> Callable[[AsyncSession | None], IssueRepository]:
+    """Return a factory closure for SqliteIssueRepository.
+
+    Args:
+        db_path: SQLite database file path.
+
+    Returns:
+        Factory function compatible with BackendProfile.make_issue_repo.
+    """
+    def factory(_session: AsyncSession | None) -> IssueRepository:
+        from src.adapters.sqlite.issue_repository import SqliteIssueRepository
+        return SqliteIssueRepository(db_path)
+    return factory
+
+
+def _sqlite_job_repo(db_path: str) -> Callable[[AsyncSession | None], IngestionJobRepository]:
+    """Return a factory closure for SqliteIngestionJobRepository.
+
+    Args:
+        db_path: SQLite database file path.
+
+    Returns:
+        Factory function compatible with BackendProfile.make_job_repo.
+    """
+    def factory(_session: AsyncSession | None) -> IngestionJobRepository:
+        from src.adapters.sqlite.ingestion_job_repository import SqliteIngestionJobRepository
+        return SqliteIngestionJobRepository(db_path)
+    return factory
+
+
+def _make_sqlite_profile(name: str, db_path: str) -> BackendProfile:
+    """Construct a BackendProfile backed by SQLite at *db_path*.
+
+    Args:
+        name:    Profile name string.
+        db_path: SQLite database file path (":memory:" for ephemeral).
+
+    Returns:
+        Fully wired BackendProfile using SQLite repositories.
+    """
+    return BackendProfile(
+        name=name,
+        make_project_repo=_sqlite_project_repo(db_path),
+        make_document_repo=_sqlite_document_repo(db_path),
+        make_issue_repo=_sqlite_issue_repo(db_path),
+        make_job_repo=_sqlite_job_repo(db_path),
     )
 
 
@@ -116,22 +208,14 @@ PRODUCTION_PROFILE = BackendProfile(
     make_job_repo=_postgres_job_repo,
 )
 
-# Aliases — quickstart / personal will resolve to SQLite once Phase 2 lands.
-# For now they raise NotImplementedError so callers know what is missing.
-QUICKSTART_PROFILE = BackendProfile(
+QUICKSTART_PROFILE = _make_sqlite_profile(
     name="quickstart",
-    make_project_repo=_sqlite_stub,   # type: ignore[arg-type]
-    make_document_repo=_sqlite_stub,  # type: ignore[arg-type]
-    make_issue_repo=_sqlite_stub,     # type: ignore[arg-type]
-    make_job_repo=_sqlite_stub,       # type: ignore[arg-type]
+    db_path=_sqlite_db_path(":memory:"),
 )
 
-PERSONAL_PROFILE = BackendProfile(
+PERSONAL_PROFILE = _make_sqlite_profile(
     name="personal",
-    make_project_repo=_sqlite_stub,   # type: ignore[arg-type]
-    make_document_repo=_sqlite_stub,  # type: ignore[arg-type]
-    make_issue_repo=_sqlite_stub,     # type: ignore[arg-type]
-    make_job_repo=_sqlite_stub,       # type: ignore[arg-type]
+    db_path=_sqlite_db_path(str(_DEFAULT_PERSONAL_DB)),
 )
 
 _PROFILES: dict[str, BackendProfile] = {
