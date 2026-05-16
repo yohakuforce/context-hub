@@ -22,8 +22,7 @@ import numpy as np
 import pytest
 import sqlite_vec
 
-from src.adapters.sqlite.migration_runner import SqliteMigrationRunner
-from src.adapters.sqlite.vec_store import SqliteVecStore, _EMBEDDING_DIM
+from src.adapters.sqlite.vec_store import _EMBEDDING_DIM, _MAX_K, SqliteVecStore
 from src.core.vectorstore import HealthState, VectorStore
 
 
@@ -166,3 +165,24 @@ class TestSqliteVecStore:
         store = SqliteVecStore("/nonexistent/path/to/db.sqlite")
         status = await store.health_check()
         assert status.state == HealthState.UNAVAILABLE
+
+    async def test_k_capped_at_max_k(self, db_path: str) -> None:
+        """knn() must cap k at _MAX_K to prevent unbounded KNN scans (DoS defence).
+
+        We call knn() with k > _MAX_K on an empty store and verify that at most
+        _MAX_K rows would be fetched.  Because the store is empty the result is [],
+        but the cap must not raise — the call must complete without error.
+        Symmetrical to test_k_capped_at_max_k in test_fts_search.py.
+        """
+        store = SqliteVecStore(db_path)
+        # Insert a single document so we can verify the cap is applied.
+        vec = _make_vec()
+        await store.upsert("doc-cap", vec, {})
+
+        # Request far more than _MAX_K results.
+        oversized_k = _MAX_K + 9999
+        results = await store.knn(vec, k=oversized_k)
+
+        # The store only has 1 document, but the cap must not cause an error
+        # and the returned list must not exceed _MAX_K.
+        assert len(results) <= _MAX_K

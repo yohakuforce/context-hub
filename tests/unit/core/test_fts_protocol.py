@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
-
 from src.core.fts import FullTextSearch
 from src.core.vectorstore import ScoredId
-
 
 # ---------------------------------------------------------------------------
 # Minimal conforming implementation
@@ -14,10 +11,14 @@ from src.core.vectorstore import ScoredId
 
 
 class _MinimalFTS:
-    async def index(self, doc_id: str, content: str, lang: str) -> None:
+    async def index(
+        self, doc_id: str, content: str, lang: str, project_id: str = ""
+    ) -> None:
         pass
 
-    async def search(self, q: str, k: int, filter=None) -> list[ScoredId]:
+    async def search(
+        self, q: str, k: int, project_id: str = "", filter: object = None
+    ) -> list[ScoredId]:
         return []
 
     async def delete(self, doc_id: str) -> None:
@@ -25,10 +26,14 @@ class _MinimalFTS:
 
 
 class _MissingDelete:
-    async def index(self, doc_id: str, content: str, lang: str) -> None:
+    async def index(
+        self, doc_id: str, content: str, lang: str, project_id: str = ""
+    ) -> None:
         pass
 
-    async def search(self, q: str, k: int, filter=None) -> list[ScoredId]:
+    async def search(
+        self, q: str, k: int, project_id: str = "", filter: object = None
+    ) -> list[ScoredId]:
         return []
 
 
@@ -38,13 +43,13 @@ class _MissingDelete:
 
 
 class TestFullTextSearchProtocol:
-    def test_minimal_implementation_satisfies_protocol(self):
+    def test_minimal_implementation_satisfies_protocol(self) -> None:
         fts = _MinimalFTS()
         assert isinstance(fts, FullTextSearch)
 
-    def test_missing_method_fails_protocol_check(self):
+    def test_missing_method_fails_protocol_check(self) -> None:
         fts = _MissingDelete()
         assert not isinstance(fts, FullTextSearch)
 
-    def test_plain_object_fails(self):
+    def test_plain_object_fails(self) -> None:
         assert not isinstance(object(), FullTextSearch)

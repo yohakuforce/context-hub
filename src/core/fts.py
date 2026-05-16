@@ -32,13 +32,17 @@ class FullTextSearch(Protocol):
         doc_id: str,
         content: str,
         lang: Lang,
+        project_id: str = "",
     ) -> None:
         """Add or update a document in the full-text index.
 
         Args:
-            doc_id:  Stable document identifier (UUID string).
-            content: Plain text to index (pre-processed by the caller).
-            lang:    Language hint for tokenisation / stemming.
+            doc_id:     Stable document identifier (UUID string).
+            content:    Plain text to index (pre-processed by the caller).
+            lang:       Language hint for tokenisation / stemming.
+            project_id: Project scope stored alongside each FTS row so that
+                        search() can enforce tenant isolation without a JOIN.
+                        Defaults to "" for single-tenant / legacy callers.
         """
         ...
 
@@ -46,14 +50,20 @@ class FullTextSearch(Protocol):
         self,
         q: str,
         k: int,
+        project_id: str,
         filter: MetaFilter | None = None,
     ) -> list[ScoredId]:
         """Execute a full-text query and return top-k scored document IDs.
 
+        project_id is mandatory to enforce multi-tenant isolation: each
+        implementation must restrict results to documents belonging to the
+        specified project, preventing cross-project data leakage.
+
         Args:
-            q:      Raw query string (the adapter handles tokenisation).
-            k:      Maximum number of results.
-            filter: Optional metadata filter (same semantics as VectorStore).
+            q:          Raw query string (the adapter handles tokenisation).
+            k:          Maximum number of results.
+            project_id: Project scope; implementations MUST filter by this value.
+            filter:     Optional metadata filter (same semantics as VectorStore).
 
         Returns:
             List of ScoredId sorted by descending score, length <= k.

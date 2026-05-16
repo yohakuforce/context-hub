@@ -73,7 +73,13 @@ def open_connection(db_path: str | Path) -> Generator[sqlite3.Connection, None, 
     # timeout=30 causes Python to retry on SQLITE_BUSY for up to 30 seconds
     # before raising OperationalError; busy_timeout PRAGMA provides the same
     # guarantee at the C-library level.
-    conn = sqlite3.connect(str(db_path), timeout=30)
+    #
+    # isolation_level=None: enable autocommit mode so that Python never issues
+    # an implicit BEGIN.  All transactions are driven explicitly via
+    # conn.execute("BEGIN") / conn.execute("COMMIT") in the adapters.  This
+    # prevents "cannot start a transaction within a transaction" errors when
+    # DDL or seed INSERTs are run inside migration scripts.
+    conn = sqlite3.connect(str(db_path), timeout=30, isolation_level=None)
     try:
         load_sqlite_vec(conn)
         _apply_connection_settings(conn)

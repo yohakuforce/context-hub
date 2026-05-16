@@ -77,6 +77,9 @@ dev = [
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "--cov=src --cov-report=term-missing --cov-fail-under=80"
+markers = [
+    "local_postgres: requires a local Postgres instance; not run in CI by default",
+]
 
 [tool.coverage.run]
 omit = [
