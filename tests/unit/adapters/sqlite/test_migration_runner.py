@@ -84,13 +84,19 @@ class TestSqliteMigrationRunner:
     async def test_upgrade_with_nonexistent_schema_dir(
         self, tmp_path: Path
     ) -> None:
-        """upgrade() with missing schema_dir is a safe no-op."""
+        """upgrade() must fail loudly if schema_dir is missing.
+
+        Previously this silently returned, which masked a packaging bug where
+        the bundled migration files were not shipped with the wheel. The
+        contract is now: missing schema dir => FileNotFoundError.
+        """
         db_path = str(tmp_path / "test.db")
         runner = SqliteMigrationRunner(
             db_path=db_path,
             schema_dir=tmp_path / "does_not_exist",
         )
-        await runner.upgrade()  # must not raise
+        with pytest.raises(FileNotFoundError, match="Schema directory not found"):
+            await runner.upgrade()
 
     async def test_upgrade_with_explicit_target(self, tmp_path: Path) -> None:
         db_path = str(tmp_path / "test.db")
