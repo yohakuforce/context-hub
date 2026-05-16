@@ -208,7 +208,8 @@ def _validate_embedding(embedding: np.ndarray) -> None:
 
 def _to_blob(embedding: np.ndarray) -> bytes:
     """Serialize a float32 ndarray to a little-endian binary blob for sqlite-vec."""
-    return embedding.astype(np.float32).tobytes()
+    blob: bytes = embedding.astype(np.float32).tobytes()
+    return blob
 
 
 def _ensure_meta_table(conn: sqlite3.Connection) -> None:
