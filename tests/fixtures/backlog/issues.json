@@ -1,0 +1,60 @@
+[
+  {
+    "id": 100001,
+    "projectId": 10001,
+    "issueKey": "PROJ-101",
+    "keyId": 101,
+    "issueType": {"id": 1, "name": "バグ"},
+    "summary": "ログイン画面で認証エラーが発生する",
+    "description": "特定の条件下でログインが失敗する。再現手順:\n1. ブラウザキャッシュをクリア\n2. 正しい認証情報を入力\n3. ログインボタンをクリック",
+    "resolution": null,
+    "priority": {"id": 2, "name": "高"},
+    "status": {"id": 1, "name": "未対応"},
+    "assignee": {
+      "id": 2001,
+      "userId": "tanaka.taro",
+      "name": "田中 太郎",
+      "roleType": 1
+    },
+    "category": [{"id": 101, "name": "認証"}],
+    "versions": [],
+    "milestone": [],
+    "startDate": null,
+    "dueDate": "2026-06-01T00:00:00Z",
+    "estimatedHours": null,
+    "actualHours": null,
+    "created": "2026-05-10T09:00:00Z",
+    "createdUser": {"id": 2001, "name": "田中 太郎"},
+    "updated": "2026-05-15T10:00:00Z",
+    "updatedUser": {"id": 2002, "name": "鈴木 花子"}
+  },
+  {
+    "id": 100002,
+    "projectId": 10001,
+    "issueKey": "PROJ-102",
+    "keyId": 102,
+    "issueType": {"id": 2, "name": "タスク"},
+    "summary": "API レスポンス時間の最適化",
+    "description": "検索 API の平均レスポンスが 800ms を超えている。目標 200ms 以下。",
+    "resolution": null,
+    "priority": {"id": 3, "name": "中"},
+    "status": {"id": 2, "name": "処理中"},
+    "assignee": {
+      "id": 2002,
+      "userId": "suzuki.hanako",
+      "name": "鈴木 花子",
+      "roleType": 1
+    },
+    "category": [{"id": 102, "name": "パフォーマンス"}],
+    "versions": [{"id": 201, "name": "v1.1"}],
+    "milestone": [],
+    "startDate": "2026-05-14T00:00:00Z",
+    "dueDate": "2026-05-28T00:00:00Z",
+    "estimatedHours": 8.0,
+    "actualHours": 3.0,
+    "created": "2026-05-12T14:00:00Z",
+    "createdUser": {"id": 2003, "name": "山田 次郎"},
+    "updated": "2026-05-16T08:00:00Z",
+    "updatedUser": {"id": 2002, "name": "鈴木 花子"}
+  }
+]

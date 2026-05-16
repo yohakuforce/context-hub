@@ -1,0 +1,60 @@
+{
+  "issues": [
+    {
+      "id": 200001,
+      "project": {"id": 30001, "name": "サンプルプロジェクト"},
+      "tracker": {"id": 1, "name": "Bug"},
+      "status": {"id": 1, "name": "New"},
+      "priority": {"id": 2, "name": "High"},
+      "author": {"id": 4001, "name": "Yamamoto Kenji"},
+      "assigned_to": {"id": 4002, "name": "Ito Sachiko"},
+      "category": {"id": 501, "name": "Backend"},
+      "subject": "DB connection pool exhaustion under load",
+      "description": "Under high load (>100 concurrent requests), the PostgreSQL connection pool becomes exhausted. Connection timeout occurs after 30 seconds.",
+      "start_date": "2026-05-10",
+      "due_date": "2026-05-25",
+      "done_ratio": 30,
+      "is_private": false,
+      "created_on": "2026-05-10T08:00:00Z",
+      "updated_on": "2026-05-15T14:00:00Z",
+      "journals": [
+        {
+          "id": 30001,
+          "user": {"id": 4002, "name": "Ito Sachiko"},
+          "notes": "Connection pool size increased to 50. Will monitor for 48 hours.",
+          "created_on": "2026-05-12T10:00:00Z",
+          "details": []
+        },
+        {
+          "id": 30002,
+          "user": {"id": 4001, "name": "Yamamoto Kenji"},
+          "notes": "Confirmed improvement. Peak load now handled at 150 concurrent requests.",
+          "created_on": "2026-05-15T14:00:00Z",
+          "details": []
+        }
+      ]
+    },
+    {
+      "id": 200002,
+      "project": {"id": 30001, "name": "サンプルプロジェクト"},
+      "tracker": {"id": 2, "name": "Feature"},
+      "status": {"id": 2, "name": "In Progress"},
+      "priority": {"id": 3, "name": "Normal"},
+      "author": {"id": 4003, "name": "Nakamura Ryota"},
+      "assigned_to": {"id": 4003, "name": "Nakamura Ryota"},
+      "category": null,
+      "subject": "Implement CSV export for audit logs",
+      "description": "Users need to export audit logs as CSV for compliance reporting.",
+      "start_date": "2026-05-13",
+      "due_date": "2026-05-30",
+      "done_ratio": 60,
+      "is_private": false,
+      "created_on": "2026-05-13T09:00:00Z",
+      "updated_on": "2026-05-16T07:00:00Z",
+      "journals": []
+    }
+  ],
+  "total_count": 2,
+  "offset": 0,
+  "limit": 100
+}

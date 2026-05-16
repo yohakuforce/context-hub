@@ -1,0 +1,12 @@
+{
+  "wiki_page": {
+    "title": "Architecture_Overview",
+    "version": 5,
+    "text": "# Architecture Overview\n\n## System Components\n- FastAPI application server\n- PostgreSQL 16 with pgvector extension\n- BGE-M3 embedding model (local)\n- APScheduler for background tasks\n\n## Data Flow\n1. Source adapters fetch data from Slack / Backlog / Redmine\n2. Normalizers convert to domain objects\n3. Embedding service generates dense vectors\n4. Repository layer persists to PostgreSQL\n5. Query endpoint performs hybrid search (FTS + vector + RRF)",
+    "project": {"id": 30001, "name": "サンプルプロジェクト", "identifier": "sample-proj"},
+    "author": {"id": 4001, "name": "Yamamoto Kenji"},
+    "comments": "",
+    "created_on": "2026-04-01T09:00:00Z",
+    "updated_on": "2026-05-10T11:00:00Z"
+  }
+}

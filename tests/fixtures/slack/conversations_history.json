@@ -1,0 +1,29 @@
+{
+  "ok": true,
+  "messages": [
+    {
+      "type": "message",
+      "user": "U_ALPHA_001",
+      "text": "本日のスプリント計画の件ですが、バックログ消化率が 85% に達しました。",
+      "ts": "1700100000.000001",
+      "thread_ts": "1700100000.000001",
+      "reply_count": 2
+    },
+    {
+      "type": "message",
+      "user": "U_BETA_002",
+      "text": "インフラ側のセットアップが完了しました。デプロイ可能な状態です。",
+      "ts": "1700100100.000002"
+    },
+    {
+      "type": "message",
+      "user": "U_GAMMA_003",
+      "text": "テスト環境の接続確認が取れました。本番展開のスケジュールを共有します。",
+      "ts": "1700100200.000003"
+    }
+  ],
+  "has_more": false,
+  "response_metadata": {
+    "next_cursor": ""
+  }
+}

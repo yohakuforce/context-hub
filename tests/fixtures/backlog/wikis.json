@@ -1,0 +1,24 @@
+[
+  {
+    "id": 70001,
+    "projectId": 10001,
+    "name": "開発ガイドライン",
+    "content": "# 開発ガイドライン\n\n## コーディング規約\n- PEP 8 準拠\n- 型ヒント必須\n- テストカバレッジ 80% 以上\n\n## ブランチ戦略\n- main: 本番リリース済み\n- develop: 開発ブランチ\n- feature/*: 機能開発",
+    "project": {"id": 10001, "projectKey": "PROJ"},
+    "createdUser": {"id": 2003, "name": "山田 次郎"},
+    "created": "2026-04-01T09:00:00Z",
+    "updatedUser": {"id": 2003, "name": "山田 次郎"},
+    "updated": "2026-05-10T11:00:00Z"
+  },
+  {
+    "id": 70002,
+    "projectId": 10001,
+    "name": "インフラ構成",
+    "content": "# インフラ構成\n\n## 本番環境\n- OS: Ubuntu 22.04\n- コンテナ: Docker + Docker Compose\n- DB: PostgreSQL 16\n\n## 監視\n- Prometheus + Grafana",
+    "project": {"id": 10001, "projectKey": "PROJ"},
+    "createdUser": {"id": 2001, "name": "田中 太郎"},
+    "created": "2026-04-15T10:00:00Z",
+    "updatedUser": {"id": 2001, "name": "田中 太郎"},
+    "updated": "2026-05-14T09:00:00Z"
+  }
+]
