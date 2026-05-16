@@ -130,7 +130,6 @@ markers = [
 omit = [
     "src/infrastructure/llm/claude_adapter.py",
     "src/infrastructure/llm/openai_adapter.py",
-    "src/mcp/server.py",
     "src/infrastructure/db/access_control_repository.py",
     "src/infrastructure/db/audit_log_repository.py",
 ]

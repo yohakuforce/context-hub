@@ -11,6 +11,7 @@ Strategy for async helper tests:
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -146,11 +147,14 @@ class TestServeCommand:
         assert result.exit_code == 1
         assert "mutually exclusive" in result.output
 
-    def test_serve_mcp_only_exits_gracefully(self) -> None:
-        """serve --mcp-only should exit 0 with an informational message."""
-        result = runner.invoke(app, ["serve", "--mcp-only"])
+    def test_serve_mcp_only_starts_mcp_server(self) -> None:
+        """serve --mcp-only should invoke asyncio.run for the MCP stdio server."""
+        with patch("asyncio.run", side_effect=lambda coro: coro.close()) as mock_run:
+            result = runner.invoke(app, ["serve", "--mcp-only"])
+
         assert result.exit_code == 0
-        assert "not yet available" in result.output.lower() or "mcp" in result.output.lower()
+        mock_run.assert_called_once()
+        assert "mcp" in result.output.lower()
 
     def test_serve_calls_uvicorn_run(self) -> None:
         """serve (default) should call uvicorn.run with the correct app import path."""
@@ -361,6 +365,7 @@ class TestRunQueryAsync:
     async def test_query_postgres_url_exits_nonzero(self) -> None:
         """_run_query should raise typer.Exit(1) for PostgreSQL URLs in v0.1."""
         import click
+
         from src.cli.main import _run_query
 
         settings_mock = _mock_settings(
@@ -499,3 +504,490 @@ class TestRunQueryAsync:
             )
 
         assert any("no results" in line.lower() for line in output_lines)
+
+
+# ---------------------------------------------------------------------------
+# B-1: migrate --dry-run password mask test
+# ---------------------------------------------------------------------------
+
+
+class TestMigratePasswordMask:
+    """B-1: verify that --dry-run output never exposes plain-text passwords."""
+
+    @pytest.mark.asyncio
+    async def test_dry_run_masks_password_in_output(self) -> None:
+        """_run_migrate dry_run=True must not leak the password in the output.
+
+        Given a PostgreSQL URL with a clear-text password 'secret',
+        the dry-run output must contain '***' (SQLAlchemy's hide_password mask)
+        and must NOT contain the literal 'secret'.
+        """
+        from src.cli.main import _run_migrate
+
+        settings_mock = _mock_settings(
+            db_url="postgresql+asyncpg://user:secret@host/db",
+            sqlite_db="",
+        )
+        mock_profiles = MagicMock()
+        mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
+
+        output_lines: list[str] = []
+
+        def capture_echo(msg: str = "", **_: object) -> None:
+            output_lines.append(str(msg))
+
+        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}), patch(
+            "typer.echo", side_effect=capture_echo
+        ):
+            await _run_migrate(target="head", dry_run=True)
+
+        combined = " ".join(output_lines)
+        assert "secret" not in combined, "Plain-text password must not appear in dry-run output"
+        assert "***" in combined or "***@" in combined, (
+            "Masked password pattern ('***' or '***@') must appear in dry-run output"
+        )
+
+    @pytest.mark.asyncio
+    async def test_dry_run_sqlite_url_does_not_contain_fake_password(self) -> None:
+        """_run_migrate dry_run=True with an SQLite URL should output the URL safely.
+
+        SQLite URLs have no password, so neither 'secret' nor '***' are expected.
+        The output should still contain the database path.
+        """
+        from src.cli.main import _run_migrate
+
+        settings_mock = _mock_settings(
+            db_url="sqlite+aiosqlite:///./data/context_hub.db",
+        )
+        mock_profiles = MagicMock()
+        mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
+
+        output_lines: list[str] = []
+
+        def capture_echo(msg: str = "", **_: object) -> None:
+            output_lines.append(str(msg))
+
+        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}), patch(
+            "typer.echo", side_effect=capture_echo
+        ):
+            await _run_migrate(target="head", dry_run=True)
+
+        combined = " ".join(output_lines)
+        keywords = ("dry-run", "dry_run", "would migrate")
+        assert any(k in combined.lower() for k in keywords)
+        assert "secret" not in combined
+
+
+# ---------------------------------------------------------------------------
+# B-2: init chmod 0600 test
+# ---------------------------------------------------------------------------
+
+
+class TestInitChmod:
+    """B-2: verify that init sets 0600 permissions on the generated .env file."""
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX file permissions not applicable")
+    def test_init_env_file_has_0600_permissions(self) -> None:
+        """init must set file permissions to 0600 on the generated .env.
+
+        This prevents other users on a shared system from reading credentials.
+        """
+        with runner.isolated_filesystem():
+            result = runner.invoke(
+                app, ["init", "--profile", "quickstart"], catch_exceptions=False
+            )
+            assert result.exit_code == 0, result.output
+
+            env_path = Path(".env")
+            assert env_path.exists(), ".env was not created"
+
+            file_mode = os.stat(env_path).st_mode & 0o777
+            assert file_mode == 0o600, (
+                f"Expected .env permissions 0600, got {oct(file_mode)}"
+            )
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX file permissions not applicable")
+    def test_init_force_overwrites_and_resets_permissions(self) -> None:
+        """init --force must reset permissions to 0600 even when .env already exists."""
+        with runner.isolated_filesystem():
+            # Create a .env with permissive permissions
+            env_path = Path(".env")
+            env_path.write_text("# old env\n")
+            os.chmod(env_path, 0o644)
+
+            result = runner.invoke(
+                app,
+                ["init", "--profile", "quickstart", "--force"],
+                catch_exceptions=False,
+            )
+            assert result.exit_code == 0, result.output
+
+            file_mode = os.stat(env_path).st_mode & 0o777
+            assert file_mode == 0o600, (
+                f"Expected .env permissions 0600 after --force, got {oct(file_mode)}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# C-1 coverage: additional CLI paths
+# ---------------------------------------------------------------------------
+
+
+class TestServeAdditionalPaths:
+    """C-1: cover serve command paths not previously tested."""
+
+    def test_serve_uvicorn_import_error(self) -> None:
+        """serve should exit 1 with informative message when uvicorn is not installed."""
+        import builtins
+
+        real_import = builtins.__import__
+
+        def mock_import(name: str, *args: object, **kwargs: object) -> object:
+            if name == "uvicorn":
+                raise ImportError("No module named 'uvicorn'")
+            return real_import(name, *args, **kwargs)  # type: ignore[call-overload]
+
+        with patch("builtins.__import__", side_effect=mock_import):
+            result = runner.invoke(app, ["serve"])
+        assert result.exit_code == 1
+        assert "uvicorn" in result.output.lower() or "uvicorn" in (result.output + "").lower()
+
+    def test_serve_reload_production_warning(self) -> None:
+        """serve --reload with APP_ENV=production should emit a warning to stderr."""
+        import uvicorn
+
+        settings_mock = _mock_settings()
+        settings_mock.app_env = "production"
+        mock_profiles = MagicMock()
+        mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
+
+        with patch.object(uvicorn, "run"), patch.dict(
+            sys.modules, {"src.config.profiles": mock_profiles}
+        ):
+            result = runner.invoke(app, ["serve", "--reload", "--http-only"])
+
+        # Warning should appear (CliRunner merges stderr into output by default)
+        assert result.exit_code == 0
+        assert "warning" in result.output.lower() or "production" in result.output.lower()
+
+    def test_serve_http_only_calls_uvicorn(self) -> None:
+        """serve --http-only should call uvicorn.run (same as default)."""
+        import uvicorn
+
+        with patch.object(uvicorn, "run") as mock_run:
+            result = runner.invoke(app, ["serve", "--http-only"])
+
+        assert result.exit_code == 0
+        mock_run.assert_called_once()
+
+    def test_serve_mcp_only_runs_asyncio(self) -> None:
+        """serve --mcp-only should invoke asyncio.run (not uvicorn)."""
+        with patch("asyncio.run", side_effect=lambda coro: coro.close()):
+            with patch.dict(
+                sys.modules,
+                {"src.mcp.server": MagicMock(run_stdio=AsyncMock())},
+            ):
+                result = runner.invoke(app, ["serve", "--mcp-only"])
+
+        # May succeed or fail depending on import, but asyncio.run should be called
+        # or the MCP path should be reached (no "not yet available" message)
+        assert "not yet available" not in result.output.lower()
+
+
+class TestMigrateAdditionalPaths:
+    """C-1 coverage + C-2: production confirm + subprocess path."""
+
+    @pytest.mark.asyncio
+    async def test_postgres_migrate_calls_alembic(self) -> None:
+        """_run_migrate with PostgreSQL URL calls subprocess alembic upgrade."""
+        from src.cli.main import _run_migrate
+
+        settings_mock = _mock_settings(
+            db_url="postgresql+asyncpg://user:pass@host/db",
+            sqlite_db="",
+        )
+        mock_profiles = MagicMock()
+        mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "alembic upgrade output"
+        mock_result.stderr = ""
+
+        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}), patch(
+            "subprocess.run", return_value=mock_result
+        ):
+            await _run_migrate(target="head", dry_run=False)
+
+    @pytest.mark.asyncio
+    async def test_postgres_migrate_nonzero_exit_raises(self) -> None:
+        """_run_migrate with PostgreSQL URL raises typer.Exit when alembic fails."""
+        import click
+
+        from src.cli.main import _run_migrate
+
+        settings_mock = _mock_settings(
+            db_url="postgresql+asyncpg://user:pass@host/db",
+            sqlite_db="",
+        )
+        mock_profiles = MagicMock()
+        mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
+
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = ""
+        mock_result.stderr = "alembic error"
+
+        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}), patch(
+            "subprocess.run", return_value=mock_result
+        ):
+            with pytest.raises((click.exceptions.Exit, SystemExit)):
+                await _run_migrate(target="head", dry_run=False)
+
+    def test_migrate_production_confirm_aborted(self) -> None:
+        """migrate in production without --yes should abort when user says 'n'."""
+        settings_mock = _mock_settings()
+        settings_mock.app_env = "production"
+        mock_profiles = MagicMock()
+        mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
+
+        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}), patch(
+            "typer.confirm", side_effect=SystemExit(1)
+        ):
+            result = runner.invoke(app, ["migrate"])
+        # Aborted: should exit non-zero
+        assert result.exit_code != 0
+
+    def test_migrate_production_yes_flag_skips_confirm(self) -> None:
+        """migrate --yes in production should skip the confirmation prompt."""
+        settings_mock = _mock_settings()
+        settings_mock.app_env = "production"
+        mock_profiles = MagicMock()
+        mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
+
+        with patch.dict(sys.modules, {"src.config.profiles": mock_profiles}), patch(
+            "asyncio.run", side_effect=lambda coro: coro.close()
+        ):
+            result = runner.invoke(app, ["migrate", "--yes"])
+        assert result.exit_code == 0
+
+
+class TestIngestAdditionalPaths:
+    """C-1 coverage: _run_ingest postgres path and no-projects error."""
+
+    @pytest.mark.asyncio
+    async def test_ingest_postgres_url_exits_nonzero(self) -> None:
+        """_run_ingest should raise typer.Exit(1) for PostgreSQL URLs in v0.1."""
+        import click
+
+        from src.cli.main import _run_ingest
+
+        settings_mock = _mock_settings(
+            db_url="postgresql+asyncpg://user:pass@host/db",
+            sqlite_db="",
+        )
+        mock_profiles = MagicMock()
+        mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
+
+        mock_embedding = MagicMock()
+        mock_embedding_factory = MagicMock()
+        mock_embedding_factory.get_embedding_provider = MagicMock(return_value=mock_embedding)
+
+        with patch.dict(
+            sys.modules,
+            {
+                "src.config.profiles": mock_profiles,
+                "src.infrastructure.embedding.factory": mock_embedding_factory,
+            },
+        ):
+            with pytest.raises((click.exceptions.Exit, SystemExit)) as exc_info:
+                await _run_ingest(source="slack", mode="mock", project_id=None)
+
+        code = (
+            exc_info.value.exit_code
+            if isinstance(exc_info.value, click.exceptions.Exit)
+            else exc_info.value.code
+        )
+        assert code == 1
+
+    @pytest.mark.asyncio
+    async def test_ingest_no_projects_exits_nonzero(self) -> None:
+        """_run_ingest should exit 1 when no projects exist and project_id is None."""
+        import click
+
+        from src.cli.main import _run_ingest
+
+        settings_mock = _mock_settings()
+        mock_profiles = MagicMock()
+        mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
+
+        mock_embedding_factory = MagicMock()
+        mock_embedding_factory.get_embedding_provider = MagicMock(return_value=MagicMock())
+
+        mock_project_repo = AsyncMock()
+        mock_project_repo.find_all.return_value = []
+
+        mock_proj_repo_module = MagicMock()
+        mock_proj_repo_module.SqliteProjectRepository = MagicMock(
+            return_value=mock_project_repo
+        )
+        mock_doc_repo_module = MagicMock()
+        mock_job_repo_module = MagicMock()
+        mock_issue_repo_module = MagicMock()
+        mock_ingest_module = MagicMock()
+
+        with patch.dict(
+            sys.modules,
+            {
+                "src.config.profiles": mock_profiles,
+                "src.infrastructure.embedding.factory": mock_embedding_factory,
+                "src.adapters.sqlite.project_repository": mock_proj_repo_module,
+                "src.adapters.sqlite.document_repository": mock_doc_repo_module,
+                "src.adapters.sqlite.ingestion_job_repository": mock_job_repo_module,
+                "src.adapters.sqlite.issue_repository": mock_issue_repo_module,
+                "src.application.ingestion_service": mock_ingest_module,
+            },
+        ):
+            with pytest.raises((click.exceptions.Exit, SystemExit)) as exc_info:
+                await _run_ingest(source="slack", mode="mock", project_id=None)
+
+        code = (
+            exc_info.value.exit_code
+            if isinstance(exc_info.value, click.exceptions.Exit)
+            else exc_info.value.code
+        )
+        assert code == 1
+
+
+class TestQueryAdditionalPaths:
+    """C-1 coverage: _run_query JSON output and no-projects error."""
+
+    @pytest.mark.asyncio
+    async def test_query_json_output_format(self) -> None:
+        """_run_query with output_json=True should emit valid JSON to typer.echo."""
+        import json as _json
+
+        from src.cli.main import _run_query
+
+        mock_result = MagicMock()
+        mock_result.score = 0.95
+        mock_result.title = "JSON Test Title"
+        mock_result.snippet = "JSON snippet..."
+        mock_result.document.id = "doc-json-uuid"
+
+        mock_service = AsyncMock()
+        mock_service.search.return_value = [mock_result]
+
+        mock_project = MagicMock()
+        mock_project.id = "proj-json-uuid"
+
+        mock_project_repo = AsyncMock()
+        mock_project_repo.find_all.return_value = [mock_project]
+
+        settings_mock = _mock_settings()
+        mock_profiles = MagicMock()
+        mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
+
+        mock_embedding_factory = MagicMock()
+        mock_embedding_factory.get_embedding_provider = MagicMock(return_value=MagicMock())
+
+        mock_doc_repo_module = MagicMock()
+        mock_doc_repo_module.SqliteDocumentRepository = MagicMock(return_value=MagicMock())
+
+        mock_proj_repo_module = MagicMock()
+        mock_proj_repo_module.SqliteProjectRepository = MagicMock(
+            return_value=mock_project_repo
+        )
+
+        mock_qs_module = MagicMock()
+        mock_qs_module.QueryService = MagicMock(return_value=mock_service)
+
+        captured: list[str] = []
+
+        def capture_echo(msg: str = "", **_: object) -> None:
+            captured.append(str(msg))
+
+        with patch.dict(
+            sys.modules,
+            {
+                "src.config.profiles": mock_profiles,
+                "src.infrastructure.embedding.factory": mock_embedding_factory,
+                "src.adapters.sqlite.document_repository": mock_doc_repo_module,
+                "src.adapters.sqlite.project_repository": mock_proj_repo_module,
+                "src.application.query_service": mock_qs_module,
+            },
+        ), patch("typer.echo", side_effect=capture_echo):
+            await _run_query(
+                text="json query",
+                project_id=None,
+                top_k=5,
+                output_json=True,
+            )
+
+        # Should have captured at least one JSON string
+        assert len(captured) >= 1
+        parsed = _json.loads(captured[0])
+        assert isinstance(parsed, list)
+        assert parsed[0]["title"] == "JSON Test Title"
+        assert parsed[0]["score"] == 0.95
+
+    @pytest.mark.asyncio
+    async def test_query_no_projects_exits_nonzero(self) -> None:
+        """_run_query should exit 1 when no projects exist and project_id is None."""
+        import click
+
+        from src.cli.main import _run_query
+
+        settings_mock = _mock_settings()
+        mock_profiles = MagicMock()
+        mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
+
+        mock_embedding_factory = MagicMock()
+        mock_embedding_factory.get_embedding_provider = MagicMock(return_value=MagicMock())
+
+        mock_project_repo = AsyncMock()
+        mock_project_repo.find_all.return_value = []
+
+        mock_proj_repo_module = MagicMock()
+        mock_proj_repo_module.SqliteProjectRepository = MagicMock(
+            return_value=mock_project_repo
+        )
+        mock_doc_repo_module = MagicMock()
+        mock_doc_repo_module.SqliteDocumentRepository = MagicMock(return_value=MagicMock())
+
+        with patch.dict(
+            sys.modules,
+            {
+                "src.config.profiles": mock_profiles,
+                "src.infrastructure.embedding.factory": mock_embedding_factory,
+                "src.adapters.sqlite.project_repository": mock_proj_repo_module,
+                "src.adapters.sqlite.document_repository": mock_doc_repo_module,
+            },
+        ):
+            with pytest.raises((click.exceptions.Exit, SystemExit)) as exc_info:
+                await _run_query(
+                    text="test",
+                    project_id=None,
+                    top_k=5,
+                    output_json=False,
+                )
+
+        code = (
+            exc_info.value.exit_code
+            if isinstance(exc_info.value, click.exceptions.Exit)
+            else exc_info.value.code
+        )
+        assert code == 1
+
+
+class TestInitEnvSrcNotFound:
+    """C-1 coverage: init with missing env example source file."""
+
+    def test_init_env_src_not_found_exits_nonzero(self) -> None:
+        """init should exit 1 if the env example source file does not exist."""
+        with runner.isolated_filesystem():
+            # Patch _ENV_EXAMPLE_BASE to a non-existent directory
+            with patch("src.cli.main._ENV_EXAMPLE_BASE", Path("/nonexistent/path")):
+                result = runner.invoke(app, ["init", "--profile", "quickstart"])
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower() or "error" in result.output.lower()

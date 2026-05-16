@@ -139,7 +139,7 @@ def serve(
         bool,
         typer.Option(
             "--mcp-only",
-            help="Start MCP transport only (no HTTP REST API).",
+            help="Start MCP stdio transport only (no HTTP REST API).",
         ),
     ] = False,
     http_only: Annotated[
@@ -156,7 +156,7 @@ def serve(
 ) -> None:
     """Start the Context-Hub server.
 
-    By default (no flags) both the HTTP REST API and MCP transport are active.
+    By default (no flags) both the HTTP REST API and MCP stdio transport are active.
     Use --http-only or --mcp-only to limit to a single transport.
 
     The server reads configuration from the .env file in the current working
@@ -172,8 +172,13 @@ def serve(
         raise typer.Exit(code=1)
 
     if mcp_only:
-        typer.echo("MCP-only mode is not yet available in v0.1. Use the HTTP API.")
-        raise typer.Exit(code=0)
+        import asyncio
+
+        from src.mcp.server import run_stdio
+
+        typer.echo("Starting Context-Hub MCP server (stdio transport) ...")
+        asyncio.run(run_stdio())
+        return
 
     try:
         import uvicorn
@@ -183,6 +188,20 @@ def serve(
             err=True,
         )
         raise typer.Exit(code=1)
+
+    # Warn if --reload is used in production
+    from src.config.profiles import get_profile_settings
+
+    try:
+        _settings = get_profile_settings()
+        if reload and _settings.app_env == "production":
+            typer.echo(
+                "Warning: --reload is enabled in production mode. "
+                "This is not recommended for production deployments.",
+                err=True,
+            )
+    except Exception:  # noqa: BLE001
+        pass  # Do not block startup if settings cannot be loaded
 
     typer.echo(f"Starting Context-Hub HTTP server on http://{host}:{port} ...")
     uvicorn.run(
@@ -513,6 +532,14 @@ def migrate(
             help="Print what would be migrated without applying changes.",
         ),
     ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            help="Skip confirmation prompt (for CI / non-interactive environments).",
+        ),
+    ] = False,
 ) -> None:
     """Apply pending database migrations.
 
@@ -520,12 +547,33 @@ def migrate(
       sqlite+aiosqlite://  -> SqliteMigrationRunner (schema/sqlite/)
       postgresql+asyncpg:// -> Alembic (alembic.ini must be present)
 
+    In production (APP_ENV=production), a confirmation prompt is shown unless
+    --yes / -y is passed.
+
     Example:
         context-hub migrate
         context-hub migrate --target 001
         context-hub migrate --dry-run
+        context-hub migrate --yes   # non-interactive (CI)
     """
     import asyncio
+
+    # Production safety gate: require explicit confirmation unless --yes is passed.
+    if not dry_run and not yes:
+        try:
+            from src.config.profiles import get_profile_settings
+
+            _settings = get_profile_settings()
+            if _settings.app_env == "production":
+                typer.confirm(
+                    "You are about to apply migrations to a PRODUCTION database. Continue?",
+                    abort=True,
+                )
+        except typer.Abort:
+            typer.echo("Aborted.")
+            raise typer.Exit(code=1)
+        except Exception:  # noqa: BLE001
+            pass  # If settings cannot be loaded, proceed without confirmation
 
     asyncio.run(_run_migrate(target=target, dry_run=dry_run))
 

@@ -1,0 +1,16 @@
+{
+  "_comment": "Context-Hub MCP configuration for AI-PM (Claude Desktop / Claude Code) integration.",
+  "_description": "AI-PM connects to Context-Hub over MCP stdio to answer questions about your project context (issues, documents, meetings) without sending raw data to external services.",
+
+  "mcpServers": {
+    "context-hub": {
+      "command": "context-hub",
+      "args": ["serve", "--mcp-only"],
+      "env": {
+        "CONTEXT_HUB_API_KEY": "your-api-key-here",
+        "CH_PROFILE": "personal",
+        "CH_SQLITE_DB": "/path/to/your/data/context_hub.db"
+      }
+    }
+  }
+}

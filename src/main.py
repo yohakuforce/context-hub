@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.middleware.error_handlers import register_error_handlers
 from src.api.routers import issues, projects, query, sync
 from src.config import settings
+from src.mcp import MCP_PROTOCOL_VERSION
 
 logger = structlog.get_logger()
 
@@ -93,6 +94,20 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["ops"])
     async def health() -> dict:
         return {"status": "ok", "env": settings.app_env}
+
+    # --- MCP version check (AI-PM can call this at startup to verify compatibility) ---
+    @app.get("/mcp/version", tags=["mcp"])
+    async def mcp_version() -> dict:
+        """Return the MCP protocol version supported by this server.
+
+        AI-PM (Claude Desktop / Claude Code) should call this at startup
+        to verify transport compatibility before opening the stdio channel.
+        """
+        return {
+            "mcp_protocol_version": MCP_PROTOCOL_VERSION,
+            "server": "context-hub",
+            "server_version": "0.1.0",
+        }
 
     return app
 
