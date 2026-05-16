@@ -43,9 +43,8 @@ dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
 
-    # Database
+    # Database (core — SQLite works out of the box)
     "sqlalchemy>=2.0.0",
-    "asyncpg>=0.29.0",
     "alembic>=1.13.0",
 
     # HTTP client (Backlog / Redmine)
@@ -53,18 +52,6 @@ dependencies = [
 
     # Slack
     "slack-sdk>=3.27.0",
-
-    # pgvector SQLAlchemy integration
-    "pgvector>=0.3.0",
-
-    # Whisper (local transcription)
-    "openai-whisper>=20231117",
-    "ffmpeg-python>=0.2.0",
-
-    # Document parsing
-    "pymupdf>=1.24.0",
-    "python-docx>=1.0.0",
-    "markdown-it-py>=3.0.0",
 
     # Scheduling
     "apscheduler>=3.10.0",
@@ -99,6 +86,22 @@ embedding = [
     "FlagEmbedding>=1.2",
     "sentence-transformers>=2.5",
 ]
+# PostgreSQL support — installs asyncpg (requires libpq) and pgvector.
+# SQLite users do not need this extra.
+postgres = [
+    "asyncpg>=0.29.0",
+    "pgvector>=0.3.0",
+]
+# Local audio transcription via Whisper.
+# Requires ffmpeg in PATH and pulls numba/llvmlite/CMake at build time.
+audio = [
+    "openai-whisper>=20231117",
+    "ffmpeg-python>=0.2.0",
+]
+# Future: PDF / DOCX / Markdown document parsing.
+# Intentionally empty in v0.1 (YAGNI — none of these modules are imported yet).
+# Re-add pymupdf, python-docx, markdown-it-py here when the feature lands.
+documents = []
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",

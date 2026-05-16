@@ -76,7 +76,7 @@ class InMemoryProjectRepository:
 # Fixtures
 # ---------------------------------------------------------------------------
 
-_TEST_API_KEY = "ctx-hub-dev-stub"
+_TEST_API_KEY = "integration-test-dev-key"
 _HEADERS = {"X-Api-Key": _TEST_API_KEY}
 
 
@@ -133,6 +133,12 @@ def app(repos):
         document_repo=doc_repo,
         embedding_provider=embedding,
     )
+
+    # Patch auth module so DEV_API_KEY == _TEST_API_KEY for integration tests.
+    import src.api.middleware.auth as _auth_mod
+    _auth_mod._DEV_API_KEY = _TEST_API_KEY  # noqa: SLF001
+    _auth_mod._APP_ENV = "development"  # noqa: SLF001
+
     return app_
 
 

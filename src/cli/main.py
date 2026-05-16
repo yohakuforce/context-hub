@@ -97,7 +97,8 @@ def init(
         raise typer.Exit(code=1)
 
     shutil.copy(env_src, env_dest)
-    typer.echo(f"Wrote .env from profile '{profile}'.")
+    os.chmod(env_dest, 0o600)
+    typer.echo(f"Wrote .env from profile '{profile}' (permissions: 600).")
 
     data_dir = Path("data")
     data_dir.mkdir(exist_ok=True)
@@ -148,13 +149,6 @@ def serve(
             help="Start HTTP REST API only (no MCP transport).",
         ),
     ] = False,
-    both: Annotated[
-        bool,
-        typer.Option(
-            "--both",
-            help="Start both HTTP REST API and MCP transport (default behaviour).",
-        ),
-    ] = False,
     reload: Annotated[
         bool,
         typer.Option("--reload", help="Enable uvicorn hot-reload (development only)."),
@@ -167,6 +161,8 @@ def serve(
 
     The server reads configuration from the .env file in the current working
     directory (or environment variables directly).
+
+    Default behaviour: both HTTP REST API and MCP transport are started.
     """
     if mcp_only and http_only:
         typer.echo(
@@ -541,13 +537,16 @@ async def _run_migrate(target: str, dry_run: bool) -> None:
         target:  Alembic-style revision target ("head" or a revision string).
         dry_run: If True, only print what would happen without applying changes.
     """
+    from sqlalchemy.engine.url import make_url
+
     from src.config.profiles import get_profile_settings
 
     settings = get_profile_settings()
     db_url = settings.database_url
 
     if dry_run:
-        typer.echo(f"Dry-run: would migrate '{db_url}' to target='{target}'.")
+        safe_url = make_url(db_url).render_as_string(hide_password=True)
+        typer.echo(f"Dry-run: would migrate '{safe_url}' to target='{target}'.")
         return
 
     if "sqlite" in db_url:

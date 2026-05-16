@@ -11,13 +11,30 @@ Authentication flow:
 5. Check Permission for requested scope + project
 
 This module provides FastAPI Depends factories used by routers.
+
+Development note
+----------------
+When APP_ENV=development (default), the environment variable DEV_API_KEY is
+read at startup.  If set, requests carrying that key are granted full ADMIN
+access so that local development and unit tests work without a real database.
+
+DEV_API_KEY is NEVER checked in production (APP_ENV=production).  If you are
+running in production and accidentally set DEV_API_KEY, it is silently ignored.
 """
 
 from __future__ import annotations
 
+import os
+
 from fastapi import Depends, Header, HTTPException, status
 
 from src.shared.types import Scope
+
+# Read once at import time.  None when unset or when not in development.
+_APP_ENV: str = os.environ.get("APP_ENV", "development")
+_DEV_API_KEY: str | None = (
+    os.environ.get("DEV_API_KEY") if _APP_ENV == "development" else None
+)
 
 
 class AuthenticatedConsumer:
@@ -36,8 +53,12 @@ async def get_current_consumer(
 ) -> AuthenticatedConsumer:
     """FastAPI dependency: authenticate the request via X-Api-Key header.
 
-    TODO (Step 2): Wire to ConsumerRepository + bcrypt verification.
-    Currently returns a stub consumer for skeleton testing.
+    In development (APP_ENV=development), requests with the DEV_API_KEY
+    environment variable value are granted full ADMIN scope without a DB
+    lookup.  DEV_API_KEY is never accepted in production.
+
+    TODO (Step 2): Wire to ConsumerRepository + bcrypt verification for
+    production-grade authentication.
     """
     if not x_api_key:
         raise HTTPException(
@@ -45,11 +66,12 @@ async def get_current_consumer(
             detail={"code": "UNAUTHORIZED", "message": "X-Api-Key header is required."},
         )
 
-    # --- STUB: replace with real DB lookup + bcrypt.checkpw in Step 2 ---
-    # This allows the router skeleton to function without a DB connection.
-    if x_api_key == "ctx-hub-dev-stub":
+    # Development-only shortcut: accept DEV_API_KEY from the environment.
+    # _DEV_API_KEY is None when APP_ENV != "development" or when the variable
+    # is not set, so this branch is structurally unreachable in production.
+    if _DEV_API_KEY is not None and x_api_key == _DEV_API_KEY:
         return AuthenticatedConsumer(
-            consumer_id="dev-stub",
+            consumer_id="dev",
             scopes=frozenset({Scope.READ, Scope.WRITE, Scope.ADMIN}),
         )
 

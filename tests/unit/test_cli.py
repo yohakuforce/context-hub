@@ -208,7 +208,7 @@ class TestIngestCommand:
     @pytest.mark.parametrize("source", ("slack", "backlog", "redmine"))
     def test_ingest_all_valid_sources_accepted(self, source: str) -> None:
         """All three valid sources should pass validation and invoke asyncio.run."""
-        with patch("asyncio.run", return_value=None):
+        with patch("asyncio.run", side_effect=lambda coro: coro.close()):
             result = runner.invoke(app, ["ingest", source, "--mode", "mock"])
         assert result.exit_code == 0
 
@@ -220,7 +220,7 @@ class TestIngestCommand:
 
     def test_ingest_project_id_option_accepted(self) -> None:
         """ingest --project-id <uuid> should be accepted."""
-        with patch("asyncio.run", return_value=None):
+        with patch("asyncio.run", side_effect=lambda coro: coro.close()):
             result = runner.invoke(
                 app, ["ingest", "slack", "--mode", "mock", "--project-id", "test-uuid"]
             )
@@ -237,25 +237,25 @@ class TestQueryCommand:
 
     def test_query_invokes_asyncio_run(self) -> None:
         """query should invoke asyncio.run with the async pipeline."""
-        with patch("asyncio.run", return_value=None):
+        with patch("asyncio.run", side_effect=lambda coro: coro.close()):
             result = runner.invoke(app, ["query", "test query text"])
         assert result.exit_code == 0
 
     def test_query_top_k_option_accepted(self) -> None:
         """query --top-k N should be accepted without error."""
-        with patch("asyncio.run", return_value=None):
+        with patch("asyncio.run", side_effect=lambda coro: coro.close()):
             result = runner.invoke(app, ["query", "search text", "--top-k", "10"])
         assert result.exit_code == 0
 
     def test_query_json_flag_accepted(self) -> None:
         """query --json should be accepted."""
-        with patch("asyncio.run", return_value=None):
+        with patch("asyncio.run", side_effect=lambda coro: coro.close()):
             result = runner.invoke(app, ["query", "search text", "--json"])
         assert result.exit_code == 0
 
     def test_query_project_id_option_accepted(self) -> None:
         """query --project-id should be passed through."""
-        with patch("asyncio.run", return_value=None):
+        with patch("asyncio.run", side_effect=lambda coro: coro.close()):
             result = runner.invoke(
                 app, ["query", "search text", "--project-id", "proj-uuid-123"]
             )
@@ -278,19 +278,19 @@ class TestMigrateCommand:
 
     def test_migrate_dry_run_exits_zero(self) -> None:
         """migrate --dry-run should exit 0 without applying anything."""
-        with patch("asyncio.run", return_value=None):
+        with patch("asyncio.run", side_effect=lambda coro: coro.close()):
             result = runner.invoke(app, ["migrate", "--dry-run"])
         assert result.exit_code == 0
 
     def test_migrate_default_target_is_head(self) -> None:
         """migrate without --target should default to 'head'."""
-        with patch("asyncio.run", return_value=None):
+        with patch("asyncio.run", side_effect=lambda coro: coro.close()):
             result = runner.invoke(app, ["migrate"])
         assert result.exit_code == 0
 
     def test_migrate_custom_target_accepted(self) -> None:
         """migrate --target 001 should be accepted."""
-        with patch("asyncio.run", return_value=None):
+        with patch("asyncio.run", side_effect=lambda coro: coro.close()):
             result = runner.invoke(app, ["migrate", "--target", "001"])
         assert result.exit_code == 0
 
