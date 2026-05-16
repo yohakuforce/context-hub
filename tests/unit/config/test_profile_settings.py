@@ -5,6 +5,7 @@ Verifies:
 - CH_PROFILE env var is respected.
 - Unknown profiles raise ValueError.
 - Environment variable overrides work across all profiles.
+- H-4: production profile with insecure/empty SECRET_KEY raises ValueError.
 """
 
 from __future__ import annotations
@@ -14,13 +15,14 @@ from unittest.mock import patch
 
 import pytest
 
+from src.config.profiles import ProfileSettings  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _fresh_settings(profile: str, extra_env: dict[str, str] | None = None):
+def _fresh_settings(profile: str, extra_env: dict[str, str] | None = None) -> ProfileSettings:
     """Return a fresh ProfileSettings instance, bypassing lru_cache.
 
     extra_env values take precedence over profile defaults because they are
@@ -100,33 +102,38 @@ class TestPersonalProfile:
 # ---------------------------------------------------------------------------
 
 
+# A valid production SECRET_KEY used across all production profile tests.
+# Must be non-empty and differ from the insecure dev placeholder.
+_VALID_PROD_SECRET = "a" * 32
+
+
 class TestProductionProfile:
     def test_scheduler_backend_is_postgres(self) -> None:
-        s = _fresh_settings("production")
+        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
         assert s.scheduler_backend == "postgres"
 
     def test_embedding_provider_is_bge_m3(self) -> None:
-        s = _fresh_settings("production")
+        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
         assert s.embedding_provider == "bge-m3"
 
     def test_ingest_mode_is_live(self) -> None:
-        s = _fresh_settings("production")
+        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
         assert s.ingest_mode == "live"
 
     def test_llm_provider_is_claude_code(self) -> None:
-        s = _fresh_settings("production")
+        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
         assert s.llm_provider == "claude-code"
 
     def test_database_url_is_postgres(self) -> None:
-        s = _fresh_settings("production")
+        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
         assert "postgresql" in s.database_url
 
     def test_app_env_is_production(self) -> None:
-        s = _fresh_settings("production")
+        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
         assert s.app_env == "production"
 
     def test_log_level_is_warning(self) -> None:
-        s = _fresh_settings("production")
+        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
         assert s.log_level == "WARNING"
 
 
@@ -165,7 +172,10 @@ class TestGetProfileSettings:
 
     def test_env_var_override_in_production(self) -> None:
         """LLM_PROVIDER env var should override production default."""
-        s = _fresh_settings("production", extra_env={"LLM_PROVIDER": "ollama"})
+        s = _fresh_settings(
+            "production",
+            extra_env={"LLM_PROVIDER": "ollama", "SECRET_KEY": _VALID_PROD_SECRET},
+        )
         assert s.llm_provider == "ollama"
 
 
@@ -182,10 +192,62 @@ class TestProfileDistinctness:
 
     def test_quickstart_and_production_differ_in_db(self) -> None:
         qs = _fresh_settings("quickstart")
-        prod = _fresh_settings("production")
+        prod = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
         assert qs.database_url != prod.database_url
 
     def test_quickstart_and_production_differ_in_llm(self) -> None:
         qs = _fresh_settings("quickstart")
-        prod = _fresh_settings("production")
+        prod = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
         assert qs.llm_provider != prod.llm_provider
+
+
+# ---------------------------------------------------------------------------
+# H-4: production SECRET_KEY validation
+# ---------------------------------------------------------------------------
+
+
+class TestProductionSecretKeyValidation:
+    """H-4: ProfileSettings must reject insecure SECRET_KEY in production."""
+
+    def test_production_with_strong_secret_key_passes(self) -> None:
+        """A genuine secret key must not raise."""
+        s = _fresh_settings(
+            "production",
+            extra_env={"SECRET_KEY": "a" * 32},
+        )
+        assert s.app_env == "production"
+
+    def test_production_with_insecure_placeholder_raises(self) -> None:
+        """The dev placeholder must be rejected in production."""
+        with pytest.raises(ValueError, match="SECRET_KEY"):
+            _fresh_settings(
+                "production",
+                extra_env={
+                    "SECRET_KEY": "insecure-dev-secret-change-in-production",
+                },
+            )
+
+    def test_production_with_empty_secret_key_raises(self) -> None:
+        """An empty SECRET_KEY must be rejected in production.
+
+        Note: _build_profile_overrides skips empty-string values (by design),
+        so we must also explicitly set SECRET_KEY= in the env to test the
+        empty-string guard path.
+        """
+        from src.config.profiles import _build_profile_overrides
+
+        # Build production overrides but force SECRET_KEY to empty
+        overrides = _build_profile_overrides("production")  # type: ignore[arg-type]
+        overrides["SECRET_KEY"] = ""
+
+        with patch.dict(os.environ, overrides, clear=False):
+            with pytest.raises(ValueError, match="SECRET_KEY"):
+                ProfileSettings()
+
+    def test_non_production_env_with_insecure_key_does_not_raise(self) -> None:
+        """The insecure placeholder is acceptable in development."""
+        s = _fresh_settings(
+            "quickstart",
+            extra_env={"SECRET_KEY": "insecure-dev-secret-change-in-production"},
+        )
+        assert s.app_env == "development"

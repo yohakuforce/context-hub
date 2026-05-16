@@ -29,7 +29,7 @@ import functools
 import os
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Valid profile names (open type for forward compatibility).
@@ -166,6 +166,25 @@ class ProfileSettings(BaseSettings):
     # Values: bge-m3 | mock
     embedding_provider: str = _QuickstartDefaults.embedding_provider
     embedding_device: str = _QuickstartDefaults.embedding_device
+
+    @model_validator(mode="after")
+    def _validate_production_secret(self) -> ProfileSettings:
+        """Reject insecure or empty SECRET_KEY when APP_ENV=production.
+
+        Raises:
+            ValueError: If the secret key is empty or the insecure dev placeholder
+                        while ``app_env`` is ``"production"``.
+        """
+        insecure_placeholder = "insecure-dev-secret-change-in-production"
+        if self.app_env == "production" and (
+            not self.secret_key
+            or self.secret_key == insecure_placeholder
+        ):
+            raise ValueError(
+                "SECRET_KEY must be set to a strong random value in production. "
+                "Generate one with: openssl rand -hex 32"
+            )
+        return self
 
     # --- Slack ---
     slack_bot_token: str | None = None

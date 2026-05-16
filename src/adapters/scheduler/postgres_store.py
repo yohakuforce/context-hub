@@ -73,16 +73,27 @@ class PostgresSchedulerStore:
 
 
 def _normalise_url(url: str) -> str:
-    """Convert asyncpg URLs to psycopg2 for APScheduler compatibility.
+    """Convert various PostgreSQL URL schemes to psycopg2 for APScheduler compatibility.
 
     APScheduler's SQLAlchemy jobstore requires a synchronous driver.
-    If the caller supplies an asyncpg URL (from the main DATABASE_URL
-    setting) we silently convert it.
+    Handles the following input schemes:
+
+    - ``postgresql+asyncpg://`` — asyncpg async driver (from main DATABASE_URL)
+    - ``postgresql://``         — bare dialect with no driver specified
+    - ``postgres://``           — Heroku/Render shorthand (rejected by SQLAlchemy 2.x)
+
+    All are converted to ``postgresql+psycopg2://``.
 
     Args:
         url: Original database URL string.
 
     Returns:
-        Synchronous-driver URL string.
+        Synchronous-driver URL string suitable for APScheduler's SQLAlchemyJobStore.
     """
-    return url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+    if url.startswith("postgresql+asyncpg://"):
+        return url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg2://", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    return url

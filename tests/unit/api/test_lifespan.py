@@ -78,3 +78,82 @@ class TestSchedulerBackendEnvVar:
             with TestClient(app) as client:
                 resp = client.get("/health")
         assert resp.status_code == 200
+
+
+class TestLifespanShutdownTryFinally:
+    """H-5: store.shutdown must be called even if scheduler.shutdown raises."""
+
+    def test_store_shutdown_called_when_scheduler_shutdown_raises(self) -> None:
+        """If scheduler.shutdown raises, store.shutdown must still execute."""
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock
+
+        from fastapi import FastAPI
+
+        from src.main import lifespan
+
+        mock_scheduler = MagicMock()
+        mock_scheduler.shutdown.side_effect = RuntimeError("scheduler exploded")
+
+        mock_store = MagicMock()
+        mock_store.bind = MagicMock()
+        mock_store.shutdown = AsyncMock()
+
+        app = FastAPI()
+
+        # Patch the local imports inside lifespan
+        with (
+            patch(
+                "src.adapters.scheduler.factory.get_scheduler_store",
+                return_value=mock_store,
+            ),
+            patch(
+                "apscheduler.schedulers.asyncio.AsyncIOScheduler",
+                return_value=mock_scheduler,
+            ),
+        ):
+            async def run() -> None:
+                async with lifespan(app):
+                    pass  # trigger startup
+
+            with pytest.raises(RuntimeError, match="scheduler exploded"):
+                asyncio.get_event_loop().run_until_complete(run())
+
+        # store.shutdown must be called regardless of the RuntimeError
+        mock_store.shutdown.assert_called_once_with(graceful=True)
+
+    def test_store_shutdown_called_on_clean_shutdown(self) -> None:
+        """store.shutdown must also be called on normal (non-exceptional) shutdown."""
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock
+
+        from fastapi import FastAPI
+
+        from src.main import lifespan
+
+        mock_scheduler = MagicMock()
+        mock_scheduler.shutdown = MagicMock()  # does not raise
+
+        mock_store = MagicMock()
+        mock_store.bind = MagicMock()
+        mock_store.shutdown = AsyncMock()
+
+        app = FastAPI()
+
+        with (
+            patch(
+                "src.adapters.scheduler.factory.get_scheduler_store",
+                return_value=mock_store,
+            ),
+            patch(
+                "apscheduler.schedulers.asyncio.AsyncIOScheduler",
+                return_value=mock_scheduler,
+            ),
+        ):
+            async def run() -> None:
+                async with lifespan(app):
+                    pass
+
+            asyncio.get_event_loop().run_until_complete(run())
+
+        mock_store.shutdown.assert_called_once_with(graceful=True)

@@ -50,9 +50,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
-    # Graceful shutdown: wait for running jobs before stopping
-    scheduler.shutdown(wait=True)
-    await store.shutdown(graceful=True)
+    # Graceful shutdown: wait for running jobs before stopping.
+    # try/finally guarantees store.shutdown is called even if scheduler.shutdown raises.
+    try:
+        scheduler.shutdown(wait=True)
+    finally:
+        await store.shutdown(graceful=True)
     logger.info("context_hub_shutdown")
 
 
