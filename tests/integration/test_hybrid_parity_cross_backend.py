@@ -48,7 +48,7 @@ from context_hub.shared.types import (
 
 _DIM = 1024
 _SCHEMA_PATH = (
-    Path(__file__).parent.parent.parent / "schema" / "sqlite" / "001_init.sql"
+    Path(__file__).parent.parent.parent / "context_hub" / "_sqlite_schema" / "001_init.sql"
 )
 
 

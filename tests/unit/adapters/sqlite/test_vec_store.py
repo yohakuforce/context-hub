@@ -49,7 +49,7 @@ def db_path(tmp_path: Path) -> str:
 
     schema_path = (
         Path(__file__).parent.parent.parent.parent.parent
-        / "schema" / "sqlite" / "001_init.sql"
+        / "context_hub" / "_sqlite_schema" / "001_init.sql"
     )
     conn.executescript(schema_path.read_text(encoding="utf-8"))
     conn.close()

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yohakuforce-context-hub"
-version = "0.1.0a5"
+version = "0.1.0a6"
 description = "Context collection and storage foundation for AI projects (MCP-native)"
 readme = "README.md"
 requires-python = ">=3.12"
