@@ -142,13 +142,6 @@ def serve(
             help="Start MCP stdio transport only (no HTTP REST API).",
         ),
     ] = False,
-    http_only: Annotated[
-        bool,
-        typer.Option(
-            "--http-only",
-            help="Start HTTP REST API only (no MCP transport).",
-        ),
-    ] = False,
     reload: Annotated[
         bool,
         typer.Option("--reload", help="Enable uvicorn hot-reload (development only)."),
@@ -156,21 +149,11 @@ def serve(
 ) -> None:
     """Start the Context-Hub server.
 
-    By default (no flags) both the HTTP REST API and MCP stdio transport are active.
-    Use --http-only or --mcp-only to limit to a single transport.
+    Default: HTTP REST API server (use --mcp-only for stdio MCP server).
 
     The server reads configuration from the .env file in the current working
     directory (or environment variables directly).
-
-    Default behaviour: both HTTP REST API and MCP transport are started.
     """
-    if mcp_only and http_only:
-        typer.echo(
-            "Error: --mcp-only and --http-only are mutually exclusive.",
-            err=True,
-        )
-        raise typer.Exit(code=1)
-
     if mcp_only:
         import asyncio
 

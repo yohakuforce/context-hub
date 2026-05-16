@@ -35,6 +35,18 @@ The following are out of scope for v0.x:
 
 ## Security Design Notes
 
+### v0.1.0 認証ステータス (Authentication Status)
+
+| Transport | Status | Environment Variable |
+|-----------|--------|----------------------|
+| HTTP API  | `DEV_API_KEY` environment variable — development-only (`APP_ENV=development` only) | `DEV_API_KEY` |
+| MCP stdio | **Not enforced** — v0.1.0 assumes stdio localhost-only operation | N/A |
+
+- `DEV_API_KEY`: HTTP API の development-only 認証。`APP_ENV=development` のときのみ有効。
+- MCP stdio: v0.1.0 では認証未実装。stdio はローカルホスト専用運用を前提とする。
+- 本格認証 (bcrypt + ConsumerRepository) は **v0.2.0** で実装予定。
+- `CONTEXT_HUB_API_KEY` は v0.1.0 では参照されない。MCP クライアント設定から削除してよい。
+
 ### API Key Authentication (v0.x)
 
 Context-Hub v0.x uses a single `DEV_API_KEY` for local development. This is intentional:

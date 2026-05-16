@@ -6,6 +6,7 @@ Verifies:
 - Unknown profiles raise ValueError.
 - Environment variable overrides work across all profiles.
 - H-4: production profile with insecure/empty SECRET_KEY raises ValueError.
+- F-8: production profile with default/insecure DATABASE_URL raises ValueError.
 """
 
 from __future__ import annotations
@@ -102,38 +103,40 @@ class TestPersonalProfile:
 # ---------------------------------------------------------------------------
 
 
-# A valid production SECRET_KEY used across all production profile tests.
-# Must be non-empty and differ from the insecure dev placeholder.
+# Valid production env vars used across all production profile tests.
+# Must have a non-default DATABASE_URL and a non-insecure SECRET_KEY.
 _VALID_PROD_SECRET = "a" * 32
+_VALID_PROD_DB_URL = "postgresql+asyncpg://produser:prodpass@db.example.com:5432/context_hub"
+_VALID_PROD_ENV = {"SECRET_KEY": _VALID_PROD_SECRET, "DATABASE_URL": _VALID_PROD_DB_URL}
 
 
 class TestProductionProfile:
     def test_scheduler_backend_is_postgres(self) -> None:
-        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
+        s = _fresh_settings("production", extra_env=_VALID_PROD_ENV)
         assert s.scheduler_backend == "postgres"
 
     def test_embedding_provider_is_bge_m3(self) -> None:
-        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
+        s = _fresh_settings("production", extra_env=_VALID_PROD_ENV)
         assert s.embedding_provider == "bge-m3"
 
     def test_ingest_mode_is_live(self) -> None:
-        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
+        s = _fresh_settings("production", extra_env=_VALID_PROD_ENV)
         assert s.ingest_mode == "live"
 
     def test_llm_provider_is_claude_code(self) -> None:
-        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
+        s = _fresh_settings("production", extra_env=_VALID_PROD_ENV)
         assert s.llm_provider == "claude-code"
 
     def test_database_url_is_postgres(self) -> None:
-        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
+        s = _fresh_settings("production", extra_env=_VALID_PROD_ENV)
         assert "postgresql" in s.database_url
 
     def test_app_env_is_production(self) -> None:
-        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
+        s = _fresh_settings("production", extra_env=_VALID_PROD_ENV)
         assert s.app_env == "production"
 
     def test_log_level_is_warning(self) -> None:
-        s = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
+        s = _fresh_settings("production", extra_env=_VALID_PROD_ENV)
         assert s.log_level == "WARNING"
 
 
@@ -174,7 +177,7 @@ class TestGetProfileSettings:
         """LLM_PROVIDER env var should override production default."""
         s = _fresh_settings(
             "production",
-            extra_env={"LLM_PROVIDER": "ollama", "SECRET_KEY": _VALID_PROD_SECRET},
+            extra_env={"LLM_PROVIDER": "ollama", **_VALID_PROD_ENV},
         )
         assert s.llm_provider == "ollama"
 
@@ -192,12 +195,12 @@ class TestProfileDistinctness:
 
     def test_quickstart_and_production_differ_in_db(self) -> None:
         qs = _fresh_settings("quickstart")
-        prod = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
+        prod = _fresh_settings("production", extra_env=_VALID_PROD_ENV)
         assert qs.database_url != prod.database_url
 
     def test_quickstart_and_production_differ_in_llm(self) -> None:
         qs = _fresh_settings("quickstart")
-        prod = _fresh_settings("production", extra_env={"SECRET_KEY": _VALID_PROD_SECRET})
+        prod = _fresh_settings("production", extra_env=_VALID_PROD_ENV)
         assert qs.llm_provider != prod.llm_provider
 
 
@@ -210,10 +213,10 @@ class TestProductionSecretKeyValidation:
     """H-4: ProfileSettings must reject insecure SECRET_KEY in production."""
 
     def test_production_with_strong_secret_key_passes(self) -> None:
-        """A genuine secret key must not raise."""
+        """A genuine secret key and real DB URL must not raise."""
         s = _fresh_settings(
             "production",
-            extra_env={"SECRET_KEY": "a" * 32},
+            extra_env=_VALID_PROD_ENV,
         )
         assert s.app_env == "production"
 
@@ -224,6 +227,7 @@ class TestProductionSecretKeyValidation:
                 "production",
                 extra_env={
                     "SECRET_KEY": "insecure-dev-secret-change-in-production",
+                    "DATABASE_URL": _VALID_PROD_DB_URL,
                 },
             )
 
@@ -239,6 +243,7 @@ class TestProductionSecretKeyValidation:
         # Build production overrides but force SECRET_KEY to empty
         overrides = _build_profile_overrides("production")  # type: ignore[arg-type]
         overrides["SECRET_KEY"] = ""
+        overrides["DATABASE_URL"] = _VALID_PROD_DB_URL
 
         with patch.dict(os.environ, overrides, clear=False):
             with pytest.raises(ValueError, match="SECRET_KEY"):
@@ -250,4 +255,44 @@ class TestProductionSecretKeyValidation:
             "quickstart",
             extra_env={"SECRET_KEY": "insecure-dev-secret-change-in-production"},
         )
+        assert s.app_env == "development"
+
+
+# ---------------------------------------------------------------------------
+# F-8: production DATABASE_URL validation
+# ---------------------------------------------------------------------------
+
+
+class TestProductionDatabaseUrlValidation:
+    """F-8: ProfileSettings must reject default/insecure DATABASE_URL in production."""
+
+    def test_production_with_real_db_url_passes(self) -> None:
+        """A real production DB URL must not raise."""
+        s = _fresh_settings("production", extra_env=_VALID_PROD_ENV)
+        assert s.app_env == "production"
+        assert "postgres:postgres@localhost" not in s.database_url
+
+    def test_production_with_default_db_url_raises(self) -> None:
+        """The default postgres:postgres@localhost placeholder must be rejected."""
+        with pytest.raises(ValueError, match="DATABASE_URL"):
+            _fresh_settings(
+                "production",
+                extra_env={"SECRET_KEY": _VALID_PROD_SECRET},
+                # DATABASE_URL not overridden — defaults to postgres:postgres@localhost
+            )
+
+    def test_production_with_custom_localhost_credentials_raises(self) -> None:
+        """Any URL containing 'postgres:postgres@localhost' must be rejected."""
+        with pytest.raises(ValueError, match="DATABASE_URL"):
+            _fresh_settings(
+                "production",
+                extra_env={
+                    "SECRET_KEY": _VALID_PROD_SECRET,
+                    "DATABASE_URL": "postgresql+asyncpg://postgres:postgres@localhost:5432/mydb",
+                },
+            )
+
+    def test_non_production_env_with_default_db_does_not_raise(self) -> None:
+        """Default DB URL is acceptable in development/quickstart."""
+        s = _fresh_settings("quickstart")
         assert s.app_env == "development"

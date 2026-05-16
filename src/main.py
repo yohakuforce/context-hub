@@ -72,10 +72,14 @@ def create_app() -> FastAPI:
     )
 
     # --- CORS (restrict in production) ---
+    # allow_credentials must be False when allow_origins contains "*".
+    # Per CORS spec, browsers reject "Access-Control-Allow-Credentials: true"
+    # combined with a wildcard origin, so setting it True would be a no-op
+    # at best and misleading at worst.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"] if settings.app_env == "development" else [],
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -91,9 +95,11 @@ def create_app() -> FastAPI:
     app.include_router(sync.router, prefix=api_prefix)
 
     # --- Health check (no auth required) ---
+    # Intentionally returns only {"status": "ok"} to avoid environment
+    # fingerprinting. Env details are available at /mcp/version (internal use).
     @app.get("/health", tags=["ops"])
     async def health() -> dict:
-        return {"status": "ok", "env": settings.app_env}
+        return {"status": "ok"}
 
     # --- MCP version check (AI-PM can call this at startup to verify compatibility) ---
     @app.get("/mcp/version", tags=["mcp"])

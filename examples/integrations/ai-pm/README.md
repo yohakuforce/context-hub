@@ -35,8 +35,9 @@ Claude Desktop / Claude Code
    **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
 2. Edit the config:
-   - Replace `your-api-key-here` with a value matching `DEV_API_KEY` in your `.env`
    - Set `CH_SQLITE_DB` to the absolute path of your database file
+   - Note: `CONTEXT_HUB_API_KEY` is **not required** in v0.1.0. MCP stdio auth is not
+     enforced; the server runs localhost-only. Full auth will be added in v0.2.0.
 
 3. Restart Claude Desktop. Context-Hub should appear in the MCP tools panel.
 
@@ -51,13 +52,15 @@ Add to your project's `.claude/settings.json` or `~/.claude/settings.json`:
       "command": "context-hub",
       "args": ["serve", "--mcp-only"],
       "env": {
-        "CONTEXT_HUB_API_KEY": "your-api-key-here",
         "CH_PROFILE": "personal"
       }
     }
   }
 }
 ```
+
+> Note: `CONTEXT_HUB_API_KEY` is not required in v0.1.0. MCP stdio runs localhost-only
+> without auth enforcement. Full authentication will be added in v0.2.0.
 
 ## Available MCP Tools
 
@@ -80,7 +83,7 @@ Before connecting via MCP stdio, verify the server is accessible over HTTP:
 
 ```bash
 # Start HTTP server
-context-hub serve --http-only &
+context-hub serve &
 
 # Check MCP version compatibility
 curl http://127.0.0.1:8000/mcp/version
@@ -104,7 +107,7 @@ Once connected, you can ask Claude:
 **Claude Desktop does not show Context-Hub tools**
 - Verify `context-hub` is in PATH: `which context-hub`
 - Check Claude Desktop logs for MCP connection errors
-- Ensure `CONTEXT_HUB_API_KEY` matches the value in your `.env`
+- Note: `CONTEXT_HUB_API_KEY` is not required and not checked in v0.1.0
 
 **`search_context` returns empty results**
 - Run `context-hub migrate` to ensure the database schema is up to date

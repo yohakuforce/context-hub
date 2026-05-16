@@ -80,7 +80,7 @@ class BGEM3EmbeddingAdapter:
         if not texts:
             return []
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         dense_vecs = await loop.run_in_executor(None, self._encode_sync, texts)
 
         return [

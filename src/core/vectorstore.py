@@ -16,18 +16,17 @@ Design notes:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 import numpy as np
-
 
 # ---------------------------------------------------------------------------
 # Supporting types
 # ---------------------------------------------------------------------------
 
 
-class HealthState(str, Enum):
+class HealthState(StrEnum):
     """Possible health states returned by VectorStore.health_check()."""
 
     OK = "ok"
@@ -78,7 +77,7 @@ class VectorStore(Protocol):
         self,
         doc_id: str,
         embedding: np.ndarray,
-        meta: dict,
+        meta: dict[str, object],
     ) -> None:
         """Insert or update a single embedding with associated metadata.
 

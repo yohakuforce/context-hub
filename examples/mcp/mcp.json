@@ -1,13 +1,13 @@
 {
   "_comment": "Context-Hub MCP server configuration template for Claude Desktop / Claude Code.",
   "_usage": "Copy the 'mcpServers' block into your Claude Desktop config at: ~/Library/Application Support/Claude/claude_desktop_config.json",
+  "_auth_note": "MCP stdio auth is not enforced in v0.1.0 (localhost-only operation). CONTEXT_HUB_API_KEY is NOT required and will be ignored. Full auth (bcrypt + ConsumerRepository) will be added in v0.2.0.",
 
   "mcpServers": {
     "context-hub": {
       "command": "context-hub",
       "args": ["serve", "--mcp-only"],
       "env": {
-        "CONTEXT_HUB_API_KEY": "your-api-key-here",
         "CH_PROFILE": "quickstart"
       }
     }

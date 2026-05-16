@@ -186,6 +186,27 @@ class ProfileSettings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def _validate_production_database_url(self) -> ProfileSettings:
+        """Reject insecure or default DATABASE_URL when APP_ENV=production.
+
+        The default value ``postgres:postgres@localhost`` is an insecure placeholder
+        that must not be used in a real production deployment.
+
+        Raises:
+            ValueError: If ``database_url`` is unset or contains the default insecure
+                        value while ``app_env`` is ``"production"``.
+        """
+        if self.app_env == "production" and (
+            not self.database_url
+            or "postgres:postgres@localhost" in self.database_url
+        ):
+            raise ValueError(
+                "DATABASE_URL must be set to a real production database URL "
+                "(default insecure value detected)"
+            )
+        return self
+
     # --- Slack ---
     slack_bot_token: str | None = None
 

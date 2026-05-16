@@ -205,6 +205,94 @@ class TestSearchContextTool:
         assert "error" in result
 
     @pytest.mark.asyncio
+    async def test_search_context_top_k_clamped_to_100(self) -> None:
+        """search_context must clamp topK to at most 100 (F-11)."""
+        import sys
+
+        from src.mcp.server import _tool_search_context
+
+        captured_top_k: list[int] = []
+
+        mock_service = AsyncMock()
+        mock_service.search.side_effect = lambda **kwargs: (
+            captured_top_k.append(kwargs["top_k"]) or []
+        )
+
+        settings_mock = MagicMock()
+        settings_mock.embedding_provider = "mock"
+        settings_mock.ch_sqlite_db = "./data/test.db"
+        settings_mock.database_url = "sqlite+aiosqlite:///./data/test.db"
+
+        mock_profiles = MagicMock()
+        mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
+        mock_embedding_factory = MagicMock()
+        mock_embedding_factory.get_embedding_provider = MagicMock(return_value=MagicMock())
+        mock_doc_repo_module = MagicMock()
+        mock_doc_repo_module.SqliteDocumentRepository = MagicMock(return_value=MagicMock())
+        mock_qs_module = MagicMock()
+        mock_qs_module.QueryService = MagicMock(return_value=mock_service)
+
+        with patch.dict(
+            sys.modules,
+            {
+                "src.config.profiles": mock_profiles,
+                "src.infrastructure.embedding.factory": mock_embedding_factory,
+                "src.adapters.sqlite.document_repository": mock_doc_repo_module,
+                "src.application.query_service": mock_qs_module,
+            },
+        ):
+            await _tool_search_context(
+                {"projectId": "proj-1", "query": "test", "topK": 9999999}
+            )
+
+        assert captured_top_k, "service.search should have been called"
+        assert captured_top_k[0] <= 100, f"topK should be clamped to 100, got {captured_top_k[0]}"
+
+    @pytest.mark.asyncio
+    async def test_search_context_top_k_clamped_to_minimum_1(self) -> None:
+        """search_context must clamp topK to at least 1 (F-11)."""
+        import sys
+
+        from src.mcp.server import _tool_search_context
+
+        captured_top_k: list[int] = []
+
+        mock_service = AsyncMock()
+        mock_service.search.side_effect = lambda **kwargs: (
+            captured_top_k.append(kwargs["top_k"]) or []
+        )
+
+        settings_mock = MagicMock()
+        settings_mock.embedding_provider = "mock"
+        settings_mock.ch_sqlite_db = "./data/test.db"
+        settings_mock.database_url = "sqlite+aiosqlite:///./data/test.db"
+
+        mock_profiles = MagicMock()
+        mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
+        mock_embedding_factory = MagicMock()
+        mock_embedding_factory.get_embedding_provider = MagicMock(return_value=MagicMock())
+        mock_doc_repo_module = MagicMock()
+        mock_doc_repo_module.SqliteDocumentRepository = MagicMock(return_value=MagicMock())
+        mock_qs_module = MagicMock()
+        mock_qs_module.QueryService = MagicMock(return_value=mock_service)
+
+        with patch.dict(
+            sys.modules,
+            {
+                "src.config.profiles": mock_profiles,
+                "src.infrastructure.embedding.factory": mock_embedding_factory,
+                "src.adapters.sqlite.document_repository": mock_doc_repo_module,
+                "src.application.query_service": mock_qs_module,
+            },
+        ):
+            await _tool_search_context(
+                {"projectId": "proj-1", "query": "test", "topK": 0}
+            )
+
+        assert captured_top_k, "service.search should have been called"
+        assert captured_top_k[0] >= 1, f"topK should be at least 1, got {captured_top_k[0]}"
+
+    @pytest.mark.asyncio
     async def test_search_context_calls_query_service(self) -> None:
         """search_context must delegate to QueryService.search."""
         import sys
@@ -256,7 +344,11 @@ class TestSearchContextTool:
 
     @pytest.mark.asyncio
     async def test_search_context_exception_returns_error(self) -> None:
-        """search_context must handle exceptions and return an error dict."""
+        """search_context must handle exceptions and return a generic error dict.
+
+        Internal exception details must NOT be exposed to MCP clients (F-2).
+        The error message must be a safe generic string; details go to stderr only.
+        """
         import sys
 
         from src.mcp.server import _tool_search_context
@@ -270,7 +362,10 @@ class TestSearchContextTool:
             )
 
         assert "error" in result
-        assert "DB down" in result["error"]
+        # Internal error details must NOT leak to the MCP client (F-2 security fix)
+        assert "DB down" not in result["error"]
+        assert "Search failed" in result["error"]
+        assert result["results"] == []
 
 
 # ---------------------------------------------------------------------------

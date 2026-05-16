@@ -5,7 +5,8 @@ MCP tools are thin adapters that delegate to the shared QueryService — the sam
 service used by the HTTP layer.
 
 Transport: stdio (default for Claude Desktop / Claude Code integration).
-Auth: CONTEXT_HUB_API_KEY environment variable.
+Auth: Not enforced in v0.1.0. MCP stdio is designed for localhost-only operation.
+      Full authentication (bcrypt + ConsumerRepository) will be added in v0.2.0.
 
 Protocol version: see ``MCP_PROTOCOL_VERSION`` in ``src/mcp/__init__.py``.
 
@@ -16,7 +17,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import sys
 
 from src.mcp import MCP_PROTOCOL_VERSION
@@ -129,12 +129,15 @@ MCP_TOOLS: list[dict[str, object]] = [
 def _write_message(msg: dict[str, object]) -> None:
     """Write a JSON-RPC 2.0 message to stdout (stdio transport).
 
+    Uses the binary buffer directly to guarantee UTF-8 encoding regardless of
+    the platform locale or ``PYTHONIOENCODING`` setting.
+
     Args:
         msg: The JSON-RPC message dict to serialise and write.
     """
     line = json.dumps(msg, ensure_ascii=False)
-    sys.stdout.write(line + "\n")
-    sys.stdout.flush()
+    sys.stdout.buffer.write((line + "\n").encode("utf-8"))
+    sys.stdout.buffer.flush()
 
 
 def _error_response(req_id: _RequestId, code: int, message: str) -> dict[str, object]:
@@ -265,7 +268,7 @@ async def _tool_search_context(args: dict[str, object]) -> dict[str, object]:
     project_id = str(args.get("projectId", ""))
     query_text = str(args.get("query", ""))
     raw_top_k = args.get("topK", 5)
-    top_k = int(raw_top_k) if isinstance(raw_top_k, (int, float, str)) else 5
+    top_k = max(1, min(int(raw_top_k) if isinstance(raw_top_k, (int, float, str)) else 5, 100))
 
     if not project_id or not query_text:
         return {"error": "projectId and query are required"}
@@ -304,7 +307,9 @@ async def _tool_search_context(args: dict[str, object]) -> dict[str, object]:
             ]
         }
     except Exception as exc:  # noqa: BLE001
-        return {"error": str(exc), "results": []}
+        sys.stderr.write(f"search_context failed: {exc}\n")
+        sys.stderr.flush()
+        return {"error": "Search failed. See server logs for details.", "results": []}
 
 
 # ---------------------------------------------------------------------------
@@ -317,16 +322,12 @@ async def run_stdio() -> None:
 
     Reads JSON-RPC 2.0 messages line-by-line from stdin,
     processes each, and writes responses to stdout.
-    """
-    api_key = os.environ.get("CONTEXT_HUB_API_KEY", "")
-    if not api_key:
-        sys.stderr.write(
-            "Warning: CONTEXT_HUB_API_KEY is not set. "
-            "Auth will be skipped in development mode.\n"
-        )
-        sys.stderr.flush()
 
-    loop = asyncio.get_event_loop()
+    Authentication is not enforced in v0.1.0. The stdio transport is intended
+    for localhost-only operation (Claude Desktop / Claude Code on the same
+    machine). Full auth will be added in v0.2.0.
+    """
+    loop = asyncio.get_running_loop()
     reader = asyncio.StreamReader()
     protocol = asyncio.StreamReaderProtocol(reader)
     await loop.connect_read_pipe(lambda: protocol, sys.stdin)

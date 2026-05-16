@@ -141,11 +141,10 @@ class TestInitCommand:
 class TestServeCommand:
     """Tests for `context-hub serve`."""
 
-    def test_serve_mcp_only_and_http_only_mutually_exclusive(self) -> None:
-        """serve --mcp-only --http-only should exit with code 1."""
-        result = runner.invoke(app, ["serve", "--mcp-only", "--http-only"])
-        assert result.exit_code == 1
-        assert "mutually exclusive" in result.output
+    def test_serve_unknown_flag_exits_nonzero(self) -> None:
+        """serve with an unrecognised flag should exit with a non-zero code."""
+        result = runner.invoke(app, ["serve", "--unknown-flag"])
+        assert result.exit_code != 0
 
     def test_serve_mcp_only_starts_mcp_server(self) -> None:
         """serve --mcp-only should invoke asyncio.run for the MCP stdio server."""
@@ -664,21 +663,11 @@ class TestServeAdditionalPaths:
         with patch.object(uvicorn, "run"), patch.dict(
             sys.modules, {"src.config.profiles": mock_profiles}
         ):
-            result = runner.invoke(app, ["serve", "--reload", "--http-only"])
+            result = runner.invoke(app, ["serve", "--reload"])
 
         # Warning should appear (CliRunner merges stderr into output by default)
         assert result.exit_code == 0
         assert "warning" in result.output.lower() or "production" in result.output.lower()
-
-    def test_serve_http_only_calls_uvicorn(self) -> None:
-        """serve --http-only should call uvicorn.run (same as default)."""
-        import uvicorn
-
-        with patch.object(uvicorn, "run") as mock_run:
-            result = runner.invoke(app, ["serve", "--http-only"])
-
-        assert result.exit_code == 0
-        mock_run.assert_called_once()
 
     def test_serve_mcp_only_runs_asyncio(self) -> None:
         """serve --mcp-only should invoke asyncio.run (not uvicorn)."""
