@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yohakuforce-context-hub"
-version = "0.1.0a1"
+version = "0.1.0a2"
 description = "Context collection and storage foundation for AI projects (MCP-native)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -114,6 +114,10 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["context_hub"]
+include = [
+    "context_hub/**/*.py",
+    "context_hub/_env_examples/.env.example.*",
+]
 
 [tool.hatch.build.targets.editable]
 packages = ["context_hub"]

@@ -13,9 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Namespace refactor (T-20260516-007a)**: renamed top-level package `src/` → `context_hub/`.
   All import paths updated from `from src.X` to `from context_hub.X`. Entry point changed from
   `src.cli.main:app` to `context_hub.cli.main:main`. No logic changes; purely mechanical rename.
+- **Packaging fix (0.1.0a2)**: relocated `examples/env/.env.example.{quickstart,personal,production}`
+  to `context_hub/_env_examples/` so they ship inside the wheel. Without this, `context-hub init`
+  failed in installed packages with "env example file not found".
 
 ### Added
 - `--yes` / `-y` flag for `migrate` command to skip production confirmation prompt
+
+### Fixed
+- mypy `no-any-return` error in `context_hub.adapters.sqlite.vec_store._to_blob`.
 
 ---
 

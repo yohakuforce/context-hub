@@ -34,7 +34,7 @@ PROFILES = ("quickstart", "personal", "production")
 SOURCES = ("slack", "backlog", "redmine")
 INGEST_MODES = ("mock", "live")
 
-_ENV_EXAMPLE_BASE = Path(__file__).parent.parent.parent / "examples" / "env"
+_ENV_EXAMPLE_BASE = Path(__file__).parent.parent / "_env_examples"
 
 
 # ---------------------------------------------------------------------------
