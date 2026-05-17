@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yohakuforce-context-hub"
-version = "0.1.0a7"
+version = "0.1.0a8"
 description = "Context collection and storage foundation for AI projects (MCP-native)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -55,8 +55,9 @@ dependencies = [
     # Slack
     "slack-sdk>=3.27.0",
 
-    # Scheduling
-    "apscheduler>=3.10.0",
+    # Scheduling — v3 API. apscheduler 4.x removed the `apscheduler.schedulers`
+    # namespace and uses a redesigned API; the code base targets v3.
+    "apscheduler>=3.10.0,<4.0",
 
     # MCP
     "mcp>=1.0.0",
