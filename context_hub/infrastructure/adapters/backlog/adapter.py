@@ -1,7 +1,7 @@
 """Backlog source adapter (live + mock).
 
 Live mode  (INGEST_MODE=live):  uses BacklogClient with real API key.
-Mock mode  (INGEST_MODE=mock):  uses fixture JSON files from tests/fixtures/backlog/.
+Mock mode  (INGEST_MODE=mock):  uses fixture JSON bundled at context_hub/_fixtures/backlog/.
 
 Switch:  set environment variable INGEST_MODE=live|mock  (default: mock)
 """
@@ -25,10 +25,7 @@ from context_hub.shared.types import ProjectId, SourceType, SyncCursor
 
 
 _FIXTURE_DIR = (
-    Path(__file__).parent.parent.parent.parent.parent
-    / "tests"
-    / "fixtures"
-    / "backlog"
+    Path(__file__).parent.parent.parent.parent / "_fixtures" / "backlog"
 )
 
 

@@ -31,7 +31,7 @@ app = typer.Typer(
 # ---------------------------------------------------------------------------
 
 PROFILES = ("quickstart", "personal", "production")
-SOURCES = ("slack", "backlog", "redmine")
+SOURCES = ("slack", "backlog", "redmine", "gmail", "inbox")
 INGEST_MODES = ("mock", "live")
 
 _ENV_EXAMPLE_BASE = Path(__file__).parent.parent / "_env_examples"
@@ -229,6 +229,9 @@ def ingest(
       slack    — Fetch messages from the configured Slack workspace.
       backlog  — Fetch issues from the configured Backlog project.
       redmine  — Fetch issues from the configured Redmine instance.
+      gmail    — Fetch labelled messages from Gmail (requires [gmail] extra in live mode).
+      inbox    — Scan the local inbox folder (CH_INBOX_DIR) once and upsert any new
+                 or edited .md / .txt files. --mode is ignored for inbox.
 
     Modes:
       mock  — Use fixture data (no real API keys required).
@@ -259,8 +262,8 @@ async def _run_ingest(source: str, mode: str, project_id: str | None) -> None:
     """Async implementation for the ingest command.
 
     Args:
-        source:     Source type: slack | backlog | redmine.
-        mode:       Ingest mode: mock | live.
+        source:     Source type: slack | backlog | redmine | gmail | inbox.
+        mode:       Ingest mode: mock | live (ignored for inbox).
         project_id: Optional project UUID override.
     """
     from context_hub.config.profiles import get_profile_settings
@@ -293,6 +296,10 @@ async def _run_ingest(source: str, mode: str, project_id: str | None) -> None:
     issue_repo = SqliteIssueRepository(db_path)
     job_repo = SqliteIngestionJobRepository(db_path)
 
+    if source == "inbox":
+        await _run_inbox_ingest(project_repo, document_repo, embedding_provider, project_id)
+        return
+
     resolved_pid = project_id
     if resolved_pid is None:
         projects = await project_repo.find_all()
@@ -319,6 +326,48 @@ async def _run_ingest(source: str, mode: str, project_id: str | None) -> None:
     )
     await service.run(project_id=ProjectId(resolved_pid))
     typer.echo(f"Ingestion complete. source='{source}', project_id={resolved_pid!r}")
+
+
+async def _run_inbox_ingest(
+    project_repo: object,
+    document_repo: object,
+    embedding_provider: object,
+    project_id: str | None,
+) -> None:
+    """One-shot scan of the inbox folder via the same scan_inbox() used by the watcher."""
+    from pathlib import Path
+
+    from context_hub.config import settings as legacy_settings
+    from context_hub.services.inbox_watcher import scan_inbox
+
+    inbox_dir_raw = legacy_settings.ch_inbox_dir
+    if not inbox_dir_raw:
+        typer.echo(
+            "Error: CH_INBOX_DIR is not set. "
+            "Set it in .env (e.g. CH_INBOX_DIR=~/.context-hub/inbox) and retry.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    inbox_dir = Path(inbox_dir_raw).expanduser()
+
+    result = await scan_inbox(
+        inbox_dir=inbox_dir,
+        project_repo=project_repo,  # type: ignore[arg-type]
+        document_repo=document_repo,  # type: ignore[arg-type]
+        embedding=embedding_provider,  # type: ignore[arg-type]
+        configured_project_id=project_id or legacy_settings.ch_project_id,
+    )
+    typer.echo(
+        f"Inbox scan complete. "
+        f"ingested={len(result.ingested)} updated={len(result.updated)} "
+        f"skipped={len(result.skipped)} errors={len(result.errors)}"
+    )
+    for ext_id in result.ingested:
+        typer.echo(f"  + {ext_id}")
+    for ext_id in result.updated:
+        typer.echo(f"  ~ {ext_id}")
+    for path, err in result.errors:
+        typer.echo(f"  ! {path}: {err}", err=True)
 
 
 def _build_adapter(source: str, mode: str, settings: object) -> object:
@@ -348,6 +397,16 @@ def _build_adapter(source: str, mode: str, settings: object) -> object:
             api_key=getattr(settings, "backlog_api_key", None) or "dummy-key",
             backlog_project_key="",
             include_wiki=False,
+            ingest_mode=mode,
+        )
+    if source == "gmail":
+        from context_hub.config import settings as legacy_settings
+        from context_hub.infrastructure.adapters.gmail.adapter import GmailAdapter
+
+        return GmailAdapter(
+            credentials_file=legacy_settings.gmail_credentials_file,
+            token_file=legacy_settings.gmail_token_file,
+            query=legacy_settings.gmail_query,
             ingest_mode=mode,
         )
     # source == "redmine"

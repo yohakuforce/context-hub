@@ -144,6 +144,14 @@ def _build_adapter(source, ingest_mode: str):
                 redmine_project_identifier=source.redmine_project_identifier or "proj",
                 ingest_mode=ingest_mode,
             )
+        case SourceType.EMAIL:
+            from context_hub.infrastructure.adapters.gmail.adapter import GmailAdapter
+            return GmailAdapter(
+                credentials_file=settings.gmail_credentials_file,
+                token_file=settings.gmail_token_file,
+                query=settings.gmail_query,
+                ingest_mode=ingest_mode,
+            )
         case _:
             logger.warning("No adapter for source type: %s", source.source_type)
             return None

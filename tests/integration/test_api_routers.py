@@ -115,11 +115,11 @@ def repos():
 def app(repos):
     job_repo, doc_repo, issue_repo, project_repo, embedding = repos
 
-    # Pre-populate project repo
+    # Pre-populate project repo. asyncio.run() is the modern replacement for
+    # get_event_loop().run_until_complete() and survives prior CLI tests that
+    # close the loop.
     import asyncio
-    asyncio.get_event_loop().run_until_complete(
-        project_repo.save(_make_test_project())
-    )
+    asyncio.run(project_repo.save(_make_test_project()))
 
     app_ = create_app()
 
@@ -326,6 +326,37 @@ class TestSyncEndpoints:
         assert body["success"] is True
 
     @pytest.mark.asyncio
+    async def test_gmail_sync_returns_202(self, app):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/v1/sources/gmail/sync",
+                json={
+                    "project_id": "proj-001",
+                    "query": "label:test",
+                    "full_resync": False,
+                },
+                headers=_HEADERS,
+            )
+        assert resp.status_code == 202
+        body = resp.json()
+        assert body["success"] is True
+        assert body["data"]["status"] == "accepted"
+
+    @pytest.mark.asyncio
+    async def test_gmail_sync_accepts_missing_query(self, app):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/v1/sources/gmail/sync",
+                json={"project_id": "proj-001"},
+                headers=_HEADERS,
+            )
+        assert resp.status_code == 202
+
+    @pytest.mark.asyncio
     async def test_get_job_status_not_found(self, app):
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
@@ -449,3 +480,190 @@ class TestQueryEndpoint:
                 json={"project_id": "proj-001", "query": "test", "top_k": 5},
             )
         assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Manual document ingest (POST /api/v1/documents)
+# ---------------------------------------------------------------------------
+
+
+class TestDocumentIngestEndpoint:
+    @pytest.mark.asyncio
+    async def test_create_meeting_document_returns_201(self, app):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/v1/documents",
+                json={
+                    "project_id": "proj-001",
+                    "source_type": "meeting",
+                    "title": "2026-05-20 定例MTG",
+                    "text": "アジェンダ: バンドル設計レビュー。決定: A案で進める。",
+                    "external_id": "meeting-2026-05-20-001",
+                    "author": "koya",
+                },
+                headers=_HEADERS,
+            )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["success"] is True
+        assert body["data"]["source_type"] == "meeting"
+        assert body["data"]["external_id"] == "meeting-2026-05-20-001"
+        assert body["data"]["embedded"] is True
+
+    @pytest.mark.asyncio
+    async def test_create_document_persists_to_repo(self, app, repos):
+        _job, doc_repo, _issue, _proj, _emb = repos
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/v1/documents",
+                json={
+                    "project_id": "proj-001",
+                    "source_type": "file",
+                    "text": "README dump",
+                    "external_id": "file-readme",
+                },
+                headers=_HEADERS,
+            )
+        assert resp.status_code == 201
+        stored = await doc_repo.find_by_external_id(
+            ProjectId("proj-001"), SourceType.FILE, "file-readme"
+        )
+        assert stored is not None
+        assert stored.raw_content.text == "README dump"
+        assert stored.is_embedded is True
+
+    @pytest.mark.asyncio
+    async def test_create_document_upsert_overwrites(self, app, repos):
+        _job, doc_repo, _issue, _proj, _emb = repos
+        payload_v1 = {
+            "project_id": "proj-001",
+            "source_type": "meeting",
+            "text": "v1 body",
+            "external_id": "same-id",
+        }
+        payload_v2 = {**payload_v1, "text": "v2 body — updated"}
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            r1 = await client.post("/api/v1/documents", json=payload_v1, headers=_HEADERS)
+            r2 = await client.post("/api/v1/documents", json=payload_v2, headers=_HEADERS)
+
+        assert r1.status_code == 201
+        assert r2.status_code == 201
+        stored = await doc_repo.find_by_external_id(
+            ProjectId("proj-001"), SourceType.MEETING, "same-id"
+        )
+        assert stored is not None
+        assert stored.raw_content.text == "v2 body — updated"
+
+    @pytest.mark.asyncio
+    async def test_create_document_generates_external_id_when_absent(self, app):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/v1/documents",
+                json={
+                    "project_id": "proj-001",
+                    "source_type": "email",
+                    "text": "メール本文",
+                },
+                headers=_HEADERS,
+            )
+        assert resp.status_code == 201
+        ext_id = resp.json()["data"]["external_id"]
+        assert ext_id and len(ext_id) >= 16
+
+    @pytest.mark.asyncio
+    async def test_create_document_rejects_unknown_project(self, app):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/v1/documents",
+                json={
+                    "project_id": "proj-does-not-exist",
+                    "source_type": "meeting",
+                    "text": "anything",
+                },
+                headers=_HEADERS,
+            )
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_create_document_rejects_blacklisted_source_type(self, app):
+        """Slack/Backlog/Redmine must go through their dedicated sync endpoints."""
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/v1/documents",
+                json={
+                    "project_id": "proj-001",
+                    "source_type": "slack",
+                    "text": "should be rejected",
+                },
+                headers=_HEADERS,
+            )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_create_document_rejects_empty_text(self, app):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/v1/documents",
+                json={
+                    "project_id": "proj-001",
+                    "source_type": "meeting",
+                    "text": "",
+                },
+                headers=_HEADERS,
+            )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_create_document_requires_write_scope(self, app):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/v1/documents",
+                json={
+                    "project_id": "proj-001",
+                    "source_type": "meeting",
+                    "text": "anything",
+                },
+            )
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_create_document_prepends_title(self, app, repos):
+        _job, doc_repo, _issue, _proj, _emb = repos
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/v1/documents",
+                json={
+                    "project_id": "proj-001",
+                    "source_type": "meeting",
+                    "title": "Kick-off",
+                    "text": "本文",
+                    "external_id": "with-title",
+                },
+                headers=_HEADERS,
+            )
+        assert resp.status_code == 201
+        stored = await doc_repo.find_by_external_id(
+            ProjectId("proj-001"), SourceType.MEETING, "with-title"
+        )
+        assert stored is not None
+        assert stored.raw_content.text.startswith("# Kick-off")
+        assert "本文" in stored.raw_content.text

@@ -68,12 +68,33 @@ class Settings(BaseSettings):
     redmine_api_key: str | None = None
     redmine_base_url: str | None = None
 
+    # --- Gmail ---
+    # OAuth2 credentials from Google Cloud Console (Gmail API enabled).
+    # The token file is created automatically on first browser consent.
+    # Install live deps with: pip install 'yohakuforce-context-hub[gmail]'
+    gmail_credentials_file: str | None = None
+    gmail_token_file: str | None = None
+    # Gmail search query — defaults to a label-based opt-in so only explicitly
+    # labelled mail is ingested. Override with any Gmail search syntax.
+    gmail_query: str = "label:context-hub"
+
     # --- Whisper ---
     whisper_model: str = "medium"
 
     # --- Data paths (inside container) ---
     meetings_data_dir: str = "/app/data/meetings"
     documents_data_dir: str = "/app/data/documents"
+
+    # --- Inbox folder watcher ---
+    # When ch_inbox_dir is set, a background job scans
+    #   <ch_inbox_dir>/{meeting,file,email}/**/*.{md,txt}
+    # on the configured interval and upserts each file as a Document.
+    # Leave None / empty to disable.
+    ch_inbox_dir: str | None = None
+    ch_inbox_poll_seconds: int = 60
+    # Optional explicit project_id for the inbox watcher. When unset,
+    # the watcher uses the sole project in the repo (Context-Hub is 1:1 with a project).
+    ch_project_id: str | None = None
 
 
 # Module-level singleton — imported by the rest of the app.

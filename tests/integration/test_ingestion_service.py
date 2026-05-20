@@ -107,6 +107,28 @@ class InMemoryDocumentRepository(DocumentRepository):
         return len(docs)
 
     async def save(self, document: Document) -> Document:
+        # Mirror the real Postgres/SQLite contract: upsert keyed on
+        # (project_id, source_type, external_id). If an existing row matches,
+        # preserve its id so external_id is the stable identity.
+        for existing in self._store.values():
+            if (
+                existing.project_id == document.project_id
+                and existing.source_type == document.source_type
+                and existing.external_id == document.external_id
+            ):
+                document = Document(
+                    id=existing.id,
+                    project_id=document.project_id,
+                    source_type=document.source_type,
+                    external_id=document.external_id,
+                    raw_content=document.raw_content,
+                    structured_content=document.structured_content,
+                    embedding_vector=document.embedding_vector,
+                    ingestion_job_id=document.ingestion_job_id,
+                    created_at=existing.created_at,
+                    updated_at=document.updated_at,
+                )
+                break
         self._store[str(document.id)] = document
         return document
 

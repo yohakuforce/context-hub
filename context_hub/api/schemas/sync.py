@@ -27,6 +27,13 @@ class RedmineSyncRequest(BaseModel):
     full_resync: bool = False
 
 
+class GmailSyncRequest(BaseModel):
+    project_id: str
+    # Optional Gmail search query override. When None, falls back to settings.gmail_query.
+    query: Optional[str] = None
+    full_resync: bool = False
+
+
 class JobAcceptedResponse(BaseModel):
     job_id: str
     status: str

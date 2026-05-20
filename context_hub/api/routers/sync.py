@@ -3,6 +3,7 @@
 POST /api/v1/sources/slack/sync
 POST /api/v1/sources/backlog/sync
 POST /api/v1/sources/redmine/sync
+POST /api/v1/sources/gmail/sync
 GET  /api/v1/sources/jobs/{jobId}
 """
 
@@ -16,6 +17,7 @@ from context_hub.api.dependencies import (
     get_backlog_ingestion_service,
     get_document_repo,
     get_embedding,
+    get_gmail_ingestion_service,
     get_job_repo,
     get_issue_repo,
     get_redmine_ingestion_service,
@@ -25,6 +27,7 @@ from context_hub.api.middleware.auth import require_scope
 from context_hub.api.schemas.common import ApiResponse
 from context_hub.api.schemas.sync import (
     BacklogSyncRequest,
+    GmailSyncRequest,
     JobAcceptedResponse,
     JobStatusResponse,
     RedmineSyncRequest,
@@ -164,6 +167,43 @@ async def trigger_redmine_sync(
             job_id="pending",
             status="accepted",
             estimated_duration_seconds=120,
+        )
+    )
+
+
+@router.post(
+    "/gmail/sync",
+    response_model=ApiResponse[JobAcceptedResponse],
+    status_code=202,
+)
+async def trigger_gmail_sync(
+    request: GmailSyncRequest,
+    background_tasks: BackgroundTasks,
+    _consumer=Depends(require_scope(Scope.WRITE)),
+    job_repo: IngestionJobRepository = Depends(get_job_repo),
+    document_repo=Depends(get_document_repo),
+    issue_repo=Depends(get_issue_repo),
+    embedding=Depends(get_embedding),
+) -> ApiResponse[JobAcceptedResponse]:
+    """Start an incremental Gmail sync job (async, returns immediately)."""
+    service = get_gmail_ingestion_service(
+        query=request.query,
+        job_repo=job_repo,
+        document_repo=document_repo,
+        issue_repo=issue_repo,
+        embedding=embedding,
+    )
+    background_tasks.add_task(
+        _run_ingestion_background,
+        service,
+        ProjectId(request.project_id),
+        request.full_resync,
+    )
+    return ApiResponse.ok(
+        JobAcceptedResponse(
+            job_id="pending",
+            status="accepted",
+            estimated_duration_seconds=90,
         )
     )
 

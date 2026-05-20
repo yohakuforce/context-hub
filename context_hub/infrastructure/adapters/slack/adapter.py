@@ -1,7 +1,7 @@
 """Slack source adapter (live + mock).
 
 Live mode  (INGEST_MODE=live):  uses Slack WebClient with SLACK_BOT_TOKEN.
-Mock mode  (INGEST_MODE=mock):  uses fixture JSON from tests/fixtures/slack/.
+Mock mode  (INGEST_MODE=mock):  uses fixture JSON bundled at context_hub/_fixtures/slack/.
 
 Switch:  set environment variable INGEST_MODE=live|mock  (default: mock)
 """
@@ -25,10 +25,7 @@ from context_hub.shared.types import (
 
 
 _FIXTURE_DIR = (
-    Path(__file__).parent.parent.parent.parent.parent
-    / "tests"
-    / "fixtures"
-    / "slack"
+    Path(__file__).parent.parent.parent.parent / "_fixtures" / "slack"
 )
 
 

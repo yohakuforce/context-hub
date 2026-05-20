@@ -162,3 +162,21 @@ def get_redmine_ingestion_service(
         ingest_mode=_ingest_mode(),
     )
     return _make_ingestion_service(adapter, job_repo, document_repo, issue_repo, embedding)
+
+
+def get_gmail_ingestion_service(
+    query: str | None,
+    job_repo: IngestionJobRepository,
+    document_repo: DocumentRepository,
+    issue_repo: IssueRepository,
+    embedding: EmbeddingProvider,
+) -> IngestionService:
+    from context_hub.infrastructure.adapters.gmail.adapter import GmailAdapter
+
+    adapter = GmailAdapter(
+        credentials_file=settings.gmail_credentials_file,
+        token_file=settings.gmail_token_file,
+        query=query or settings.gmail_query,
+        ingest_mode=_ingest_mode(),
+    )
+    return _make_ingestion_service(adapter, job_repo, document_repo, issue_repo, embedding)

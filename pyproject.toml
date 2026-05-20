@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yohakuforce-context-hub"
-version = "0.1.0"
+version = "0.2.0"
 description = "Context collection and storage foundation for AI projects (MCP-native)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -117,10 +117,21 @@ audio = [
     "openai-whisper>=20231117",
     "ffmpeg-python>=0.2.0",
 ]
-# Future: PDF / DOCX / Markdown document parsing.
-# Intentionally empty in v0.1 (YAGNI — none of these modules are imported yet).
-# Re-add pymupdf, python-docx, markdown-it-py here when the feature lands.
-documents = []
+# PDF / DOCX text extraction for the multipart upload endpoint.
+# pymupdf (fitz)  — PDF parser, MIT licensed, ~30 MB wheel
+# python-docx     — DOCX paragraph / table extraction
+documents = [
+    "pymupdf>=1.24",
+    "python-docx>=1.1",
+]
+# Gmail live ingestion via the Gmail API (OAuth2). The mock adapter ships in
+# core deps and runs without these.
+gmail = [
+    "google-api-python-client>=2.0",
+    "google-auth>=2.0",
+    "google-auth-oauthlib>=1.0",
+    "google-auth-httplib2>=0.2",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
@@ -140,6 +151,7 @@ include = [
     "context_hub/**/*.py",
     "context_hub/_env_examples/.env.example.*",
     "context_hub/_sqlite_schema/*.sql",
+    "context_hub/_fixtures/**/*.json",
 ]
 
 [tool.hatch.build.targets.editable]

@@ -13,6 +13,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-05-20
+
+User-authored context, file uploads, Gmail, and a folder-drop ingest workflow.
+
+### Added
+- **`POST /api/v1/documents`** — manual text ingest (meeting notes, memos, email bodies).
+  Accepts `source_type` of `meeting | file | email`; Slack/Backlog/Redmine continue to
+  go through their dedicated `/sources/*/sync` endpoints. Upserts by
+  `(project_id, source_type, external_id)`.
+- **Inbox folder watcher** — drop `.md` / `.txt` files into
+  `$CH_INBOX_DIR/{meeting,file,email}/` and they are upserted on a polling
+  interval (default 60s). Editing a file replaces the prior document; unchanged
+  files are skipped (no re-embedding cost). Single-project deployments resolve
+  the target project automatically; multi-project deployments pin via
+  `CH_PROJECT_ID`.
+- **`context-hub ingest inbox`** — one-shot CLI scan of the inbox folder, sharing
+  the same code path as the polling watcher.
+- **Gmail adapter** — `POST /api/v1/sources/gmail/sync`, `context-hub ingest gmail`,
+  and scheduled sync via a `SourceConfig` with `source_type=EMAIL`. OAuth2 with
+  refresh-token caching; default query `label:context-hub` is label-based opt-in
+  to keep private mail out of the index. Lives behind the new `[gmail]` extra.
+- **`POST /api/v1/documents/upload`** — multipart file upload for
+  `.md` / `.txt` / `.pdf` / `.docx`. Max 10 MiB; PDF and DOCX text extraction
+  requires the new `[documents]` extra (pymupdf + python-docx).
+- **`GET /api/v1/documents/upload/supported-extensions`** — reports which
+  extensions the running install accepts.
+- **`docs/usage-guide.md`** — full operator guide covering profiles, ingest
+  paths, querying, ops, and privacy.
+
+### Changed
+- Mock fixtures are now bundled with the wheel at `context_hub/_fixtures/`
+  (previously `tests/fixtures/`). `INGEST_MODE=mock` now works in installed
+  environments — earlier alphas would `FileNotFoundError` after `pipx install`.
+- `.env.example` references the correct profile template path and uses the
+  `context-hub serve` entry point. Per-profile `.env.example.*` files document
+  the new Gmail and inbox-watcher knobs.
+- Lifespan tests migrated from the deprecated
+  `asyncio.get_event_loop().run_until_complete()` pattern to `asyncio.run()`
+  for resilience against test ordering.
+
+### Fixed
+- `InMemoryDocumentRepository` (test fake) now mirrors the production contract
+  by upserting on the `(project_id, source_type, external_id)` composite key
+  rather than `id` alone.
+- Stale references to `examples/env/...` and `uvicorn src.main:app` in
+  `.env.example` corrected.
+
+### Privacy
+- Test fixtures and example filenames scrubbed of project-specific identifiers.
+
+### Extras (optional pip extras)
+- `[gmail]` — `google-api-python-client`, `google-auth`, `google-auth-oauthlib`,
+  `google-auth-httplib2`. Required only for live Gmail ingest.
+- `[documents]` — `pymupdf`, `python-docx`. Required only for `.pdf` / `.docx`
+  upload extraction.
+
+### Upgrade Notes
+- Wire format and storage schema are unchanged from v0.1.0; existing SQLite /
+  PostgreSQL databases keep working.
+- New environment variables (all optional): `CH_INBOX_DIR`,
+  `CH_INBOX_POLL_SECONDS`, `CH_PROJECT_ID`, `GMAIL_CREDENTIALS_FILE`,
+  `GMAIL_TOKEN_FILE`, `GMAIL_QUERY`.
+
+---
+
 ## [0.1.0] - 2026-05-17
 
 Initial stable OSS release.

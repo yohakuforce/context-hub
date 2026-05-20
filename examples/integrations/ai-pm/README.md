@@ -36,8 +36,8 @@ Claude Desktop / Claude Code
 
 2. Edit the config:
    - Set `CH_SQLITE_DB` to the absolute path of your database file
-   - Note: `CONTEXT_HUB_API_KEY` is **not required** in v0.1.0. MCP stdio auth is not
-     enforced; the server runs localhost-only. Full auth will be added in v0.2.0.
+   - Note: `CONTEXT_HUB_API_KEY` is **not required** yet. MCP stdio auth is not
+     enforced; the server runs localhost-only. Full auth is planned for a future release.
 
 3. Restart Claude Desktop. Context-Hub should appear in the MCP tools panel.
 

@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from context_hub.api.middleware.error_handlers import register_error_handlers
-from context_hub.api.routers import issues, projects, query, sync
+from context_hub.api.routers import documents, issues, projects, query, sync
 from context_hub.config import settings
 from context_hub.mcp import MCP_PROTOCOL_VERSION
 
@@ -42,11 +42,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     store.bind(scheduler)
     scheduler.start()
 
+    inbox_enabled = _register_inbox_job(scheduler)
+
     logger.info(
         "context_hub_startup",
         env=settings.app_env,
         llm_provider=settings.llm_provider,
         scheduler_backend=type(store).__name__,
+        inbox_watcher_enabled=inbox_enabled,
     )
 
     yield
@@ -58,6 +61,59 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         await store.shutdown(graceful=True)
     logger.info("context_hub_shutdown")
+
+
+def _register_inbox_job(scheduler) -> bool:
+    """Wire the inbox folder watcher into the scheduler when CH_INBOX_DIR is set.
+
+    Returns True when a job was registered, False when disabled.
+    """
+    from pathlib import Path
+
+    from apscheduler.triggers.interval import IntervalTrigger
+
+    inbox_dir_raw = settings.ch_inbox_dir
+    if not inbox_dir_raw:
+        return False
+
+    inbox_dir = Path(inbox_dir_raw).expanduser()
+    poll_seconds = max(int(settings.ch_inbox_poll_seconds), 5)
+    project_id = settings.ch_project_id
+
+    async def _run_inbox_scan() -> None:
+        from context_hub.infrastructure.db.session import async_session as AsyncSessionFactory
+        from context_hub.infrastructure.db.document_repository import PostgresDocumentRepository
+        from context_hub.infrastructure.db.project_repository import PostgresProjectRepository
+        from context_hub.infrastructure.embedding.factory import get_embedding_provider
+        from context_hub.services.inbox_watcher import scan_inbox
+
+        embedding = get_embedding_provider(settings.embedding_provider)
+        async with AsyncSessionFactory() as session:
+            project_repo = PostgresProjectRepository(session)
+            document_repo = PostgresDocumentRepository(session)
+            result = await scan_inbox(
+                inbox_dir=inbox_dir,
+                project_repo=project_repo,
+                document_repo=document_repo,
+                embedding=embedding,
+                configured_project_id=project_id,
+            )
+            if result.changed_count or result.errors:
+                logger.info("inbox_scan_result", **result.as_dict())
+
+    scheduler.add_job(
+        _run_inbox_scan,
+        trigger=IntervalTrigger(seconds=poll_seconds),
+        id="inbox_watcher",
+        replace_existing=True,
+        misfire_grace_time=30,
+    )
+    logger.info(
+        "inbox_watcher_registered",
+        inbox_dir=str(inbox_dir),
+        poll_seconds=poll_seconds,
+    )
+    return True
 
 
 def create_app() -> FastAPI:
@@ -93,6 +149,7 @@ def create_app() -> FastAPI:
     app.include_router(issues.router, prefix=api_prefix)
     app.include_router(query.router, prefix=api_prefix)
     app.include_router(sync.router, prefix=api_prefix)
+    app.include_router(documents.router, prefix=api_prefix)
 
     # --- Health check (no auth required) ---
     # Intentionally returns only {"status": "ok"} to avoid environment
@@ -112,7 +169,7 @@ def create_app() -> FastAPI:
         return {
             "mcp_protocol_version": MCP_PROTOCOL_VERSION,
             "server": "context-hub",
-            "server_version": "0.1.0",
+            "server_version": "0.2.0",
         }
 
     return app

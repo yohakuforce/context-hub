@@ -1,0 +1,40 @@
+{
+  "messages": [
+    {
+      "id": "m-001",
+      "threadId": "t-001",
+      "internalDate": "1700100000000",
+      "headers": {
+        "From": "client@example.com",
+        "To": "user@example.com",
+        "Subject": "Project kickoff — Phase 1",
+        "Date": "Wed, 15 Nov 2023 10:00:00 +0900"
+      },
+      "body_text": "Hello,\n\nThis is a test fixture body. Phase 1 kickoff is scheduled for today.\n\nBest regards."
+    },
+    {
+      "id": "m-002",
+      "threadId": "t-001",
+      "internalDate": "1700200000000",
+      "headers": {
+        "From": "client@example.com",
+        "To": "user@example.com",
+        "Subject": "Re: Project kickoff — Phase 1",
+        "Date": "Thu, 16 Nov 2023 13:46:40 +0900"
+      },
+      "body_text": "Acknowledged. Sharing the materials shortly."
+    },
+    {
+      "id": "m-003",
+      "threadId": "t-002",
+      "internalDate": "1700300000000",
+      "headers": {
+        "From": "vendor@example.com",
+        "To": "user@example.com",
+        "Subject": "Quote attached",
+        "Date": "Fri, 17 Nov 2023 17:33:20 +0900"
+      },
+      "body_html": "<html><body><p>Hello,</p><p>Please find the quote attached.<br>Let us know if you have questions.</p></body></html>"
+    }
+  ]
+}

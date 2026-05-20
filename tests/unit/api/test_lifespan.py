@@ -117,7 +117,7 @@ class TestLifespanShutdownTryFinally:
                     pass  # trigger startup
 
             with pytest.raises(RuntimeError, match="scheduler exploded"):
-                asyncio.get_event_loop().run_until_complete(run())
+                asyncio.run(run())
 
         # store.shutdown must be called regardless of the RuntimeError
         mock_store.shutdown.assert_called_once_with(graceful=True)
@@ -154,6 +154,6 @@ class TestLifespanShutdownTryFinally:
                 async with lifespan(app):
                     pass
 
-            asyncio.get_event_loop().run_until_complete(run())
+            asyncio.run(run())
 
         mock_store.shutdown.assert_called_once_with(graceful=True)
