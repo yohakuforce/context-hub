@@ -5,7 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from .common import CamelModel
 
 # Source types accepted via the manual-ingest API.
 # Slack/Backlog/Redmine go through their dedicated /sources/*/sync endpoints —
@@ -13,7 +15,7 @@ from pydantic import BaseModel, Field
 UserSourceType = Literal["meeting", "file", "email"]
 
 
-class DocumentCreateRequest(BaseModel):
+class DocumentCreateRequest(CamelModel):
     """Manually ingest a single text document (meeting notes, memo, email body, etc.)."""
 
     project_id: str = Field(..., description="Target project UUID.")
@@ -51,7 +53,7 @@ class DocumentCreateRequest(BaseModel):
     )
 
 
-class DocumentResponse(BaseModel):
+class DocumentResponse(CamelModel):
     document_id: str
     project_id: str
     source_type: str

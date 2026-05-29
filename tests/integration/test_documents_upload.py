@@ -123,7 +123,7 @@ class TestDocumentUploadEndpoint:
         assert resp.status_code == 201, resp.text
         body = resp.json()
         assert body["success"] is True
-        assert body["data"]["external_id"] == "plan.md"
+        assert body["data"]["externalId"] == "plan.md"
 
         stored = await doc_repo.find_by_external_id(
             ProjectId("proj-001"), SourceType.MEETING, "plan.md"
@@ -166,7 +166,7 @@ class TestDocumentUploadEndpoint:
                 "/api/v1/documents/upload", data=data, files=files, headers=_HEADERS
             )
         assert resp.status_code == 201
-        assert resp.json()["data"]["external_id"] == "stable-id-v1"
+        assert resp.json()["data"]["externalId"] == "stable-id-v1"
 
     @pytest.mark.asyncio
     async def test_upload_rejects_unsupported_extension(self, app):

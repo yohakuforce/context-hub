@@ -9,28 +9,33 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
-from typing import AsyncGenerator
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from context_hub.adapters.sqlite.document_repository import SqliteDocumentRepository
+from context_hub.adapters.sqlite.ingestion_job_repository import (
+    SqliteIngestionJobRepository,
+)
+from context_hub.adapters.sqlite.issue_repository import SqliteIssueRepository
+from context_hub.adapters.sqlite.project_repository import SqliteProjectRepository
+from context_hub.application.ingestion_service import IngestionService
+from context_hub.application.query_service import QueryService
 from context_hub.config import settings
-from context_hub.infrastructure.db.session import get_db as get_db_session
+from context_hub.config.profiles import get_profile_settings
+from context_hub.domain.document.repository import DocumentRepository
+from context_hub.domain.ingestion.repository import IngestionJobRepository
+from context_hub.domain.issue.repository import IssueRepository
+from context_hub.domain.project.repository import ProjectRepository
 from context_hub.infrastructure.db.document_repository import PostgresDocumentRepository
 from context_hub.infrastructure.db.ingestion_job_repository import (
     PostgresIngestionJobRepository,
 )
 from context_hub.infrastructure.db.issue_repository import PostgresIssueRepository
 from context_hub.infrastructure.db.project_repository import PostgresProjectRepository
-from context_hub.infrastructure.embedding.factory import get_embedding_provider
+from context_hub.infrastructure.db.session import get_db as get_db_session
 from context_hub.infrastructure.embedding.base import EmbeddingProvider
-from context_hub.application.ingestion_service import IngestionService
-from context_hub.application.query_service import QueryService
-from context_hub.domain.document.repository import DocumentRepository
-from context_hub.domain.ingestion.repository import IngestionJobRepository
-from context_hub.domain.issue.repository import IssueRepository
-from context_hub.domain.project.repository import ProjectRepository
-
+from context_hub.infrastructure.embedding.factory import get_embedding_provider
 
 # ---------------------------------------------------------------------------
 # Embedding (singleton — model loading is expensive)
@@ -46,30 +51,54 @@ def get_embedding() -> EmbeddingProvider:
 
 
 # ---------------------------------------------------------------------------
-# Repository factories (scoped per request via AsyncSession)
+# Repository factories
+#
+# Profile-aware wiring: SQLite profiles (quickstart / personal) use the plain
+# sqlite3 adapters whose schema matches `context-hub migrate` and the MCP read
+# path. The Postgres profile uses the SQLAlchemy ORM repos bound to a per-request
+# AsyncSession. Without this split, the Postgres ORM model issues SELECTs for
+# columns (embedding, content_tsv, ...) that the SQLite migrate schema lacks,
+# producing a 500 on every REST read against a SQLite DB.
 # ---------------------------------------------------------------------------
+
+
+def _use_sqlite() -> bool:
+    return get_profile_settings().database_url.startswith("sqlite")
+
+
+def _sqlite_db_path() -> str:
+    return get_profile_settings().ch_sqlite_db
+
 
 async def get_project_repo(
     session: AsyncSession = Depends(get_db_session),
 ) -> ProjectRepository:
+    if _use_sqlite():
+        return SqliteProjectRepository(_sqlite_db_path())
     return PostgresProjectRepository(session)
 
 
 async def get_document_repo(
     session: AsyncSession = Depends(get_db_session),
 ) -> DocumentRepository:
+    if _use_sqlite():
+        return SqliteDocumentRepository(_sqlite_db_path())
     return PostgresDocumentRepository(session)
 
 
 async def get_issue_repo(
     session: AsyncSession = Depends(get_db_session),
 ) -> IssueRepository:
+    if _use_sqlite():
+        return SqliteIssueRepository(_sqlite_db_path())
     return PostgresIssueRepository(session)
 
 
 async def get_job_repo(
     session: AsyncSession = Depends(get_db_session),
 ) -> IngestionJobRepository:
+    if _use_sqlite():
+        return SqliteIngestionJobRepository(_sqlite_db_path())
     return PostgresIngestionJobRepository(session)
 
 

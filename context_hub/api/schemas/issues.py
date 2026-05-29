@@ -4,22 +4,22 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel
+from .common import CamelModel
 
 
-class AssigneeSchema(BaseModel):
+class AssigneeSchema(CamelModel):
     external_id: str
     name: str
 
 
-class CommentSchema(BaseModel):
+class CommentSchema(CamelModel):
     id: str
     author: AssigneeSchema
     body: str
     created_at: str
 
 
-class IssueSchema(BaseModel):
+class IssueSchema(CamelModel):
     id: str
     source_type: str
     external_id: str
@@ -39,7 +39,7 @@ class IssueDetailSchema(IssueSchema):
     comments: list[CommentSchema]
 
 
-class IssuesResponse(BaseModel):
+class IssuesResponse(CamelModel):
     issues: list[IssueSchema]
     total: int
     limit: int

@@ -8,9 +8,21 @@ from __future__ import annotations
 
 from typing import Any, Generic, Optional, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
 
 T = TypeVar("T")
+
+
+class CamelModel(BaseModel):
+    """Base for all wire-facing schemas.
+
+    Serializes fields as camelCase (per 02-api-spec.md) while still accepting
+    snake_case on input. The contract on the wire is camelCase; consumers
+    (AI-Project-Manager, @yohakuforce/core) depend on this.
+    """
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
 class ApiResponse(BaseModel, Generic[T]):

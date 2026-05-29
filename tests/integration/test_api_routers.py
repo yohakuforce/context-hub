@@ -231,9 +231,9 @@ class TestProjectsEndpoint:
         body = resp.json()
         assert body["success"] is True
         data = body["data"]
-        assert data["project_id"] == "proj-001"
-        assert "document_count" in data
-        assert "issue_count" in data
+        assert data["projectId"] == "proj-001"
+        assert "documentCount" in data
+        assert "issueCount" in data
 
     @pytest.mark.asyncio
     async def test_get_project_context_not_found(self, app):
@@ -391,7 +391,7 @@ class TestSyncEndpoints:
         body = resp.json()
         assert body["success"] is True
         assert body["data"]["status"] == "completed"
-        assert body["data"]["items_processed"] == 5
+        assert body["data"]["itemsProcessed"] == 5
 
     @pytest.mark.asyncio
     async def test_sync_requires_write_scope(self, app):
@@ -508,8 +508,8 @@ class TestDocumentIngestEndpoint:
         assert resp.status_code == 201
         body = resp.json()
         assert body["success"] is True
-        assert body["data"]["source_type"] == "meeting"
-        assert body["data"]["external_id"] == "meeting-2026-05-20-001"
+        assert body["data"]["sourceType"] == "meeting"
+        assert body["data"]["externalId"] == "meeting-2026-05-20-001"
         assert body["data"]["embedded"] is True
 
     @pytest.mark.asyncio
@@ -576,7 +576,7 @@ class TestDocumentIngestEndpoint:
                 headers=_HEADERS,
             )
         assert resp.status_code == 201
-        ext_id = resp.json()["data"]["external_id"]
+        ext_id = resp.json()["data"]["externalId"]
         assert ext_id and len(ext_id) >= 16
 
     @pytest.mark.asyncio

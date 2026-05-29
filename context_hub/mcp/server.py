@@ -233,10 +233,7 @@ async def _handle_request(request: dict[str, object]) -> dict[str, object] | Non
 
 
 async def _dispatch_tool(name: str, args: dict[str, object]) -> dict[str, object]:
-    """Route a tool call to the appropriate QueryService method.
-
-    search_context delegates to QueryService.search; all other tools return
-    a stub response for v0.1 (full implementation in v0.2).
+    """Route a tool call to the appropriate handler.
 
     Args:
         name: MCP tool name.
@@ -247,7 +244,17 @@ async def _dispatch_tool(name: str, args: dict[str, object]) -> dict[str, object
     """
     if name == "search_context":
         return await _tool_search_context(args)
-    # v0.1: remaining tools return a stub with a clear roadmap message
+    if name == "get_project_context":
+        return await _tool_get_project_context(args)
+    if name == "get_members":
+        return await _tool_get_members(args)
+    if name == "get_meeting":
+        return await _tool_get_meeting(args)
+    if name == "get_issues":
+        return await _tool_get_issues(args)
+    if name == "get_issue_detail":
+        return await _tool_get_issue_detail(args)
+    # Unknown / unimplemented tools
     return {
         "tool": name,
         "status": "stub",
@@ -310,6 +317,313 @@ async def _tool_search_context(args: dict[str, object]) -> dict[str, object]:
         sys.stderr.write(f"search_context failed: {exc}\n")
         sys.stderr.flush()
         return {"error": "Search failed. See server logs for details.", "results": []}
+
+
+async def _tool_get_project_context(args: dict[str, object]) -> dict[str, object]:
+    """Return project context summary via SQLite repos.
+
+    Args:
+        args: Must contain ``projectId``; optionally ``type`` (overview | full).
+
+    Returns:
+        A dict with project summary fields or an ``error`` key on failure.
+    """
+    project_id = str(args.get("projectId", ""))
+    if not project_id:
+        return {"error": "projectId is required"}
+
+    try:
+        from context_hub.adapters.sqlite.document_repository import SqliteDocumentRepository
+        from context_hub.adapters.sqlite.issue_repository import SqliteIssueRepository
+        from context_hub.adapters.sqlite.project_repository import SqliteProjectRepository
+        from context_hub.config.profiles import get_profile_settings
+        from context_hub.shared.types import ProjectId
+
+        settings = get_profile_settings()
+        db_path = settings.ch_sqlite_db or "./data/context_hub.db"
+
+        project_repo = SqliteProjectRepository(db_path)
+        document_repo = SqliteDocumentRepository(db_path)
+        issue_repo = SqliteIssueRepository(db_path)
+
+        pid = ProjectId(project_id)
+        project = await project_repo.find_by_id(pid)
+        if project is None:
+            return {"error": "Project not found"}
+
+        doc_count = await document_repo.count_by_project(pid)
+        issue_count = await issue_repo.count_by_project(pid)
+        active_sources = [s.source_type.value for s in project.sources if s.is_enabled]
+
+        return {
+            "projectId": project_id,
+            "name": project.name,
+            "summary": f"Project '{project.name}' has {doc_count} documents and {issue_count} issues.",
+            "activeSources": active_sources,
+            "documentCount": doc_count,
+            "issueCount": issue_count,
+        }
+    except Exception as exc:  # noqa: BLE001
+        sys.stderr.write(f"get_project_context failed: {exc}\n")
+        sys.stderr.flush()
+        return {"error": "get_project_context failed. See server logs for details."}
+
+
+async def _tool_get_members(args: dict[str, object]) -> dict[str, object]:
+    """Return project member information aggregated from issues via SQLite.
+
+    Args:
+        args: Must contain ``projectId``.
+
+    Returns:
+        A dict with ``members`` list or an ``error`` key on failure.
+    """
+    project_id = str(args.get("projectId", ""))
+    if not project_id:
+        return {"error": "projectId is required"}
+
+    try:
+        from context_hub.adapters.sqlite.issue_repository import SqliteIssueRepository
+        from context_hub.config.profiles import get_profile_settings
+        from context_hub.shared.types import ProjectId
+
+        settings = get_profile_settings()
+        db_path = settings.ch_sqlite_db or "./data/context_hub.db"
+
+        issue_repo = SqliteIssueRepository(db_path)
+        pid = ProjectId(project_id)
+        issues = await issue_repo.find_by_project(pid, limit=500)
+
+        member_map: dict[str, dict[str, object]] = {}
+        for issue in issues:
+            if issue.assignee:
+                key = issue.assignee.external_id
+                if key not in member_map:
+                    member_map[key] = {
+                        "externalId": key,
+                        "name": issue.assignee.name,
+                        "sources": [issue.source_type.value],
+                        "assignedIssueCount": 0,
+                    }
+                else:
+                    sources = member_map[key]["sources"]
+                    assert isinstance(sources, list)
+                    if issue.source_type.value not in sources:
+                        sources = [*sources, issue.source_type.value]
+                    member_map[key] = {**member_map[key], "sources": sources}
+                member_map[key] = {
+                    **member_map[key],
+                    "assignedIssueCount": int(member_map[key]["assignedIssueCount"]) + 1,
+                }
+
+        return {"members": list(member_map.values())}
+    except Exception as exc:  # noqa: BLE001
+        sys.stderr.write(f"get_members failed: {exc}\n")
+        sys.stderr.flush()
+        return {"error": "get_members failed. See server logs for details."}
+
+
+async def _tool_get_meeting(args: dict[str, object]) -> dict[str, object]:
+    """Return full detail of a single meeting document via SQLite.
+
+    Args:
+        args: Must contain ``projectId`` and ``meetingId``.
+
+    Returns:
+        A dict with meeting detail fields or an ``error`` key on failure.
+    """
+    project_id = str(args.get("projectId", ""))
+    meeting_id = str(args.get("meetingId", ""))
+    if not project_id or not meeting_id:
+        return {"error": "projectId and meetingId are required"}
+
+    try:
+        from context_hub.adapters.sqlite.document_repository import SqliteDocumentRepository
+        from context_hub.config.profiles import get_profile_settings
+        from context_hub.shared.types import DocumentId, SourceType
+
+        settings = get_profile_settings()
+        db_path = settings.ch_sqlite_db or "./data/context_hub.db"
+
+        document_repo = SqliteDocumentRepository(db_path)
+        doc = await document_repo.find_by_id(DocumentId(meeting_id))
+
+        if doc is None or doc.source_type != SourceType.MEETING:
+            return {"error": "Meeting not found"}
+
+        title = _mcp_derive_title(doc)
+        summary = doc.structured_content.summary if doc.structured_content else ""
+        return {
+            "meetingId": meeting_id,
+            "projectId": project_id,
+            "title": title,
+            "meetingAt": doc.raw_content.created_at.isoformat(),
+            "participants": [],
+            "rawTranscript": doc.raw_content.text,
+            "summary": summary,
+            "decisions": [],
+            "extractedTasks": [],
+        }
+    except Exception as exc:  # noqa: BLE001
+        sys.stderr.write(f"get_meeting failed: {exc}\n")
+        sys.stderr.flush()
+        return {"error": "get_meeting failed. See server logs for details."}
+
+
+async def _tool_get_issues(args: dict[str, object]) -> dict[str, object]:
+    """Return issues for a project from Backlog or Redmine via SQLite.
+
+    Args:
+        args: Must contain ``projectId`` and ``source``; optionally ``status``.
+
+    Returns:
+        A dict with ``issues`` list or an ``error`` key on failure.
+    """
+    project_id = str(args.get("projectId", ""))
+    source = str(args.get("source", ""))
+    status = str(args.get("status", "open")) if args.get("status") else "open"
+
+    if not project_id or not source:
+        return {"error": "projectId and source are required"}
+
+    try:
+        from context_hub.adapters.sqlite.issue_repository import SqliteIssueRepository
+        from context_hub.config.profiles import get_profile_settings
+        from context_hub.shared.types import IssueStatus, ProjectId, SourceType
+
+        settings = get_profile_settings()
+        db_path = settings.ch_sqlite_db or "./data/context_hub.db"
+
+        issue_repo = SqliteIssueRepository(db_path)
+        pid = ProjectId(project_id)
+
+        try:
+            source_type = SourceType(source)
+        except ValueError:
+            return {"error": f"Unknown source: {source!r}. Expected backlog or redmine."}
+
+        issue_status: IssueStatus | None = None
+        if status:
+            try:
+                issue_status = IssueStatus(status)
+            except ValueError:
+                return {"error": f"Unknown status: {status!r}"}
+
+        issues = await issue_repo.find_by_project(
+            pid,
+            source_type=source_type,
+            status=issue_status,
+            limit=50,
+        )
+
+        return {
+            "projectId": project_id,
+            "source": source,
+            "issues": [
+                {
+                    "issueId": str(issue.id),
+                    "externalId": issue.external_id,
+                    "title": issue.title,
+                    "status": issue.status.value,
+                    "priority": issue.priority.value,
+                    "assignee": (
+                        {"externalId": issue.assignee.external_id, "name": issue.assignee.name}
+                        if issue.assignee
+                        else None
+                    ),
+                    "dueDate": issue.due_date.isoformat() if issue.due_date else None,
+                    "labels": list(issue.labels),
+                    "commentCount": len(issue.comments),
+                    "updatedAt": issue.updated_at.isoformat(),
+                }
+                for issue in issues
+            ],
+            "total": len(issues),
+        }
+    except Exception as exc:  # noqa: BLE001
+        sys.stderr.write(f"get_issues failed: {exc}\n")
+        sys.stderr.flush()
+        return {"error": "get_issues failed. See server logs for details."}
+
+
+async def _tool_get_issue_detail(args: dict[str, object]) -> dict[str, object]:
+    """Return detailed information about a specific issue including comments.
+
+    Args:
+        args: Must contain ``projectId`` and ``issueId``.
+
+    Returns:
+        A dict with issue detail fields or an ``error`` key on failure.
+    """
+    project_id = str(args.get("projectId", ""))
+    issue_id = str(args.get("issueId", ""))
+
+    if not project_id or not issue_id:
+        return {"error": "projectId and issueId are required"}
+
+    try:
+        from context_hub.adapters.sqlite.issue_repository import SqliteIssueRepository
+        from context_hub.config.profiles import get_profile_settings
+        from context_hub.shared.types import IssueId
+
+        settings = get_profile_settings()
+        db_path = settings.ch_sqlite_db or "./data/context_hub.db"
+
+        issue_repo = SqliteIssueRepository(db_path)
+        issue = await issue_repo.find_by_id(IssueId(issue_id))
+
+        if issue is None or str(issue.project_id) != project_id:
+            return {"error": "Issue not found"}
+
+        return {
+            "issueId": str(issue.id),
+            "projectId": project_id,
+            "externalId": issue.external_id,
+            "sourceType": issue.source_type.value,
+            "title": issue.title,
+            "description": issue.description,
+            "status": issue.status.value,
+            "priority": issue.priority.value,
+            "assignee": (
+                {"externalId": issue.assignee.external_id, "name": issue.assignee.name}
+                if issue.assignee
+                else None
+            ),
+            "dueDate": issue.due_date.isoformat() if issue.due_date else None,
+            "labels": list(issue.labels),
+            "comments": [
+                {
+                    "commentId": str(c.id),
+                    "author": {"externalId": c.author.external_id, "name": c.author.name},
+                    "body": c.body,
+                    "createdAt": c.created_at.isoformat(),
+                }
+                for c in issue.comments
+            ],
+            "commentCount": len(issue.comments),
+            "createdAt": issue.created_at.isoformat(),
+            "updatedAt": issue.updated_at.isoformat(),
+        }
+    except Exception as exc:  # noqa: BLE001
+        sys.stderr.write(f"get_issue_detail failed: {exc}\n")
+        sys.stderr.flush()
+        return {"error": "get_issue_detail failed. See server logs for details."}
+
+
+def _mcp_derive_title(doc: object) -> str:
+    """Derive a display title from a document (mirrors _derive_title in projects router).
+
+    Args:
+        doc: A Document domain object.
+
+    Returns:
+        A short title string (at most 80 characters).
+    """
+    if doc.structured_content and doc.structured_content.summary:  # type: ignore[union-attr]
+        return doc.structured_content.summary[:80]  # type: ignore[union-attr]
+    raw = doc.raw_content.text or ""  # type: ignore[union-attr]
+    first_line = raw.split("\n")[0].strip()
+    return first_line[:80] if first_line else f"[{doc.source_type.value}]"  # type: ignore[union-attr]
 
 
 # ---------------------------------------------------------------------------

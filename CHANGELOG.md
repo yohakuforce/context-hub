@@ -9,7 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-(no unreleased changes)
+### Changed — BREAKING: REST 応答が camelCase に統一
+
+- 全 API 応答の JSON キーを **camelCase** に統一（`02-api-spec.md` の契約に準拠）。
+  従来は実装が snake_case を返しており、仕様書・コンシューマ(AI-Project-Manager /
+  @yohakuforce/core)が期待する camelCase と食い違っていた。
+  - 例: `project_id` → `projectId`, `external_id` → `externalId`,
+    `source_type` → `sourceType`, `document_count` → `documentCount`
+  - 全 wire スキーマを `CamelModel` 基底（`alias_generator=to_camel`,
+    `populate_by_name=True`）に統一。**リクエストは snake_case も後方互換で受理**。
+  - 契約ロックテスト追加: `tests/unit/api/test_schema_camelcase_contract.py`
+- **影響**: 既存の snake_case 応答に依存する外部コンシューマは要修正。
+  次回リリースは破壊的変更のため **v0.3.0** を想定（公開タイミングは別途判断）。
 
 ---
 

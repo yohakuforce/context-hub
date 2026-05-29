@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from .common import CamelModel
 
 
-class ProjectContextResponse(BaseModel):
+class ProjectContextResponse(CamelModel):
     project_id: str
     name: str
     summary: str
@@ -18,7 +18,7 @@ class ProjectContextResponse(BaseModel):
     issue_count: int
 
 
-class MemberResponse(BaseModel):
+class MemberResponse(CamelModel):
     external_id: str
     name: str
     sources: list[str]
@@ -26,11 +26,11 @@ class MemberResponse(BaseModel):
     last_activity_at: Optional[str] = None
 
 
-class MembersResponse(BaseModel):
+class MembersResponse(CamelModel):
     members: list[MemberResponse]
 
 
-class MeetingSnippetResponse(BaseModel):
+class MeetingSnippetResponse(CamelModel):
     id: str
     title: str
     meeting_at: str
@@ -38,20 +38,20 @@ class MeetingSnippetResponse(BaseModel):
     summary_snippet: str
 
 
-class MeetingsResponse(BaseModel):
+class MeetingsResponse(CamelModel):
     meetings: list[MeetingSnippetResponse]
     total: int
     limit: int
     offset: int
 
 
-class ExtractedTask(BaseModel):
+class ExtractedTask(CamelModel):
     title: str
     suggested_assignee: Optional[str] = None
     suggested_due_date: Optional[str] = None
 
 
-class MeetingDetailResponse(BaseModel):
+class MeetingDetailResponse(CamelModel):
     id: str
     title: str
     meeting_at: str

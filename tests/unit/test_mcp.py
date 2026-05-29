@@ -169,7 +169,7 @@ class TestHandleRequest:
 
     @pytest.mark.asyncio
     async def test_tools_call_stub_tool_returns_result(self) -> None:
-        """tools/call for a stub tool must return a content with 'stub' status."""
+        """tools/call for a stub tool (trigger_sync) must return content with 'stub' status."""
         from context_hub.mcp.server import _handle_request
 
         request = {
@@ -177,8 +177,8 @@ class TestHandleRequest:
             "id": 4,
             "method": "tools/call",
             "params": {
-                "name": "get_members",
-                "arguments": {"projectId": "proj-1"},
+                "name": "trigger_sync",
+                "arguments": {"projectId": "proj-1", "source": "slack"},
             },
         }
         response = await _handle_request(request)
