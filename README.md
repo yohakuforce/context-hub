@@ -18,6 +18,9 @@ Context-Hub collects project context (Slack messages, Backlog/Redmine issues, me
 | **MCP server** | stdio transport — plug directly into Claude Desktop or Claude Code |
 | **REST API** | FastAPI — for custom integrations and web UIs |
 | **Hybrid search** | Vector (sqlite-vec / pgvector) + FTS5 keyword search, RRF fusion |
+| **Meeting → tasks** | On-prem LLM extracts action tasks from meeting transcripts **at ingest time** and persists them; `get_meeting` returns `extractedTasks` (stable across reads) |
+| **Slack scraping ingest** | `POST /projects/{id}/ingest/slack` upserts scraped Slack messages (idempotent on `ts`) — no Slack API token required |
+| **camelCase contract** | All REST responses are camelCase (consumed by AI-Project-Manager / @yohakuforce/core) |
 | **Three profiles** | `quickstart` (SQLite + mock), `personal` (SQLite + BGE-M3), `production` (PostgreSQL) |
 | **Zero-dependency start** | `pipx install` then `context-hub serve` — no Docker, no Postgres, no API keys required |
 
