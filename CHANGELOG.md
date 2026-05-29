@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [0.3.0] - 2026-05-30
 
 ### Changed — BREAKING: REST 応答が camelCase に統一
 
@@ -20,7 +20,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `populate_by_name=True`）に統一。**リクエストは snake_case も後方互換で受理**。
   - 契約ロックテスト追加: `tests/unit/api/test_schema_camelcase_contract.py`
 - **影響**: 既存の snake_case 応答に依存する外部コンシューマは要修正。
-  次回リリースは破壊的変更のため **v0.3.0** を想定（公開タイミングは別途判断）。
+
+### Added
+
+- **会議メモ → タスク自動抽出**: 会議ドキュメント取込時に on-prem LLM
+  （`LLM_PROVIDER` で選択。生トランスクリプトは外部に出さない）でアクションタスクを
+  抽出し、ドキュメントに永続化。`GET /api/v1/projects/{projectId}/meetings/{meetingId}`
+  と MCP `get_meeting` が `extractedTasks`（`title` / `suggestedAssignee` /
+  `suggestedDueDate`）を返す。再読込でも結果は不変（取りこぼし防止）。
+- **`POST /api/v1/projects/{projectId}/ingest/slack`**: 外部スクレイピング由来の
+  Slack メッセージを `slack` ドキュメントとして冪等 upsert（Slack ts をキーに）。
+  Slack API トークンなしで取り込めるパス。
+
+### Fixed
+
+- **SQLite プロファイルでの REST 全読み取りが 500 になる不具合**を修正。リポジトリ
+  プロバイダを profile-aware 化し、SQLite 系では plain sqlite3 アダプタを使用
+  （Postgres ORM が SQLite スキーマに無い列を SELECT していた）。配線ロックテスト追加。
 
 ---
 
