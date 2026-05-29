@@ -22,7 +22,7 @@ import numpy as np
 
 from context_hub.adapters.sqlite.session import open_connection
 from context_hub.core.vectorstore import ScoredId
-from context_hub.domain.document.entities import Document
+from context_hub.domain.document.entities import Document, ExtractedMeetingTask
 from context_hub.domain.document.repository import DocumentRepository
 from context_hub.services.hybrid import reciprocal_rank_fusion
 from context_hub.shared.types import (
@@ -502,7 +502,13 @@ def _domain_to_values(doc: Document) -> dict[str, Any]:
             ]
         )
 
-    meta = {"ingestion_job_id": str(doc.ingestion_job_id) if doc.ingestion_job_id else None}
+    meta = {
+        "ingestion_job_id": str(doc.ingestion_job_id) if doc.ingestion_job_id else None,
+        "extracted_tasks": [
+            {"title": t.title, "assignee": t.assignee, "due_date": t.due_date}
+            for t in doc.extracted_tasks
+        ],
+    }
 
     return {
         "id": str(doc.id),
@@ -564,6 +570,15 @@ def _row_to_domain(row: sqlite3.Row) -> Document:
 
     meta = json.loads(metadata_json or "{}")
     job_id_str = meta.get("ingestion_job_id") or ingestion_job_id
+    extracted_tasks = tuple(
+        ExtractedMeetingTask(
+            title=t["title"],
+            assignee=t.get("assignee"),
+            due_date=t.get("due_date"),
+        )
+        for t in meta.get("extracted_tasks", [])
+        if isinstance(t, dict) and t.get("title")
+    )
 
     return Document(
         id=DocumentId(doc_id),
@@ -576,4 +591,5 @@ def _row_to_domain(row: sqlite3.Row) -> Document:
         ingestion_job_id=IngestionJobId(job_id_str) if job_id_str else None,
         created_at=datetime.fromisoformat(created_at),
         updated_at=datetime.fromisoformat(updated_at),
+        extracted_tasks=extracted_tasks,
     )

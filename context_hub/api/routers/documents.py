@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from context_hub.api.dependencies import (
     get_document_repo,
     get_embedding,
+    get_llm_adapter,
     get_project_repo,
 )
 from context_hub.api.middleware.auth import require_scope
@@ -37,11 +38,13 @@ from context_hub.domain.document.entities import Document
 from context_hub.domain.document.repository import DocumentRepository
 from context_hub.domain.project.repository import ProjectRepository
 from context_hub.infrastructure.embedding.base import EmbeddingProvider
+from context_hub.infrastructure.llm.base import LLMAdapter
 from context_hub.services.document_extractor import (
     ExtractionError,
     extract,
     supported_extensions,
 )
+from context_hub.services.meeting_task_extractor import extract_meeting_tasks
 from context_hub.shared.types import ProjectId, RawContent, Scope, SourceType, new_id
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -67,8 +70,14 @@ async def _save_document(
     author: str | None,
     document_repo: DocumentRepository,
     embedding: EmbeddingProvider,
+    llm: LLMAdapter | None = None,
 ) -> Document:
-    """Embed and upsert. Shared by POST / and POST /upload."""
+    """Embed and upsert. Shared by POST / and POST /upload.
+
+    For meeting documents, runs on-prem LLM task extraction once at ingestion
+    time and persists the result on the document, so subsequent reads return a
+    stable task list (a missed/drifting task is treated as a serious incident).
+    """
     raw_content = RawContent(
         text=composed_text,
         source_url=source_url,
@@ -83,6 +92,11 @@ async def _save_document(
     )
     vector = await embedding.embed(composed_text)
     document = document.with_embedding(vector)
+
+    if source_type == SourceType.MEETING and llm is not None:
+        tasks = await extract_meeting_tasks(composed_text, llm)
+        document = document.with_extracted_tasks(tasks)
+
     return await document_repo.save(document)
 
 
@@ -109,6 +123,7 @@ async def create_document(
     project_repo: ProjectRepository = Depends(get_project_repo),
     document_repo: DocumentRepository = Depends(get_document_repo),
     embedding: EmbeddingProvider = Depends(get_embedding),
+    llm: LLMAdapter = Depends(get_llm_adapter),
 ) -> ApiResponse[DocumentResponse]:
     """Insert (or upsert) a user-supplied document into the project's context store."""
     project_id = ProjectId(request.project_id)
@@ -126,6 +141,7 @@ async def create_document(
         author=request.author,
         document_repo=document_repo,
         embedding=embedding,
+        llm=llm,
     )
     return ApiResponse.ok(_to_response(saved))
 
@@ -153,6 +169,7 @@ async def upload_document(
     project_repo: ProjectRepository = Depends(get_project_repo),
     document_repo: DocumentRepository = Depends(get_document_repo),
     embedding: EmbeddingProvider = Depends(get_embedding),
+    llm: LLMAdapter = Depends(get_llm_adapter),
 ) -> ApiResponse[DocumentResponse]:
     """Upload a document file. The server extracts text and upserts it.
 
@@ -195,6 +212,7 @@ async def upload_document(
         author=author,
         document_repo=document_repo,
         embedding=embedding,
+        llm=llm,
     )
     return ApiResponse.ok(_to_response(saved))
 

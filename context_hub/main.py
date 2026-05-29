@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from context_hub.api.middleware.error_handlers import register_error_handlers
-from context_hub.api.routers import documents, issues, projects, query, sync
+from context_hub.api.routers import documents, ingest, issues, projects, query, sync
 from context_hub.config import settings
 from context_hub.mcp import MCP_PROTOCOL_VERSION
 
@@ -150,6 +150,7 @@ def create_app() -> FastAPI:
     app.include_router(query.router, prefix=api_prefix)
     app.include_router(sync.router, prefix=api_prefix)
     app.include_router(documents.router, prefix=api_prefix)
+    app.include_router(ingest.router, prefix=api_prefix)
 
     # --- Health check (no auth required) ---
     # Intentionally returns only {"status": "ok"} to avoid environment

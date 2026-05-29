@@ -36,6 +36,8 @@ from context_hub.infrastructure.db.project_repository import PostgresProjectRepo
 from context_hub.infrastructure.db.session import get_db as get_db_session
 from context_hub.infrastructure.embedding.base import EmbeddingProvider
 from context_hub.infrastructure.embedding.factory import get_embedding_provider
+from context_hub.infrastructure.llm.base import LLMAdapter
+from context_hub.infrastructure.llm.factory import create_llm_adapter
 
 # ---------------------------------------------------------------------------
 # Embedding (singleton — model loading is expensive)
@@ -48,6 +50,21 @@ def _get_embedding_singleton() -> EmbeddingProvider:
 
 def get_embedding() -> EmbeddingProvider:
     return _get_embedding_singleton()
+
+
+# ---------------------------------------------------------------------------
+# LLM adapter (per-profile; used for on-prem meeting task extraction etc.)
+# ---------------------------------------------------------------------------
+
+def get_llm_adapter() -> "LLMAdapter":
+    s = get_profile_settings()
+    return create_llm_adapter(
+        provider=s.llm_provider,
+        claude_code_timeout=s.claude_code_timeout_seconds,
+        codex_timeout=s.codex_timeout_seconds,
+        ollama_base_url=s.ollama_base_url,
+        ollama_model=s.ollama_model,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -17,7 +17,7 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from context_hub.domain.document.entities import Document
+from context_hub.domain.document.entities import Document, ExtractedMeetingTask
 from context_hub.domain.document.repository import DocumentRepository
 from context_hub.infrastructure.db.models import DocumentRow
 from context_hub.shared.types import (
@@ -299,7 +299,11 @@ def _domain_to_values(doc: Document) -> dict:
         "embedding": embedding_val,
         "embedding_model": embedding_model,
         "metadata_": {
-            "ingestion_job_id": str(doc.ingestion_job_id) if doc.ingestion_job_id else None
+            "ingestion_job_id": str(doc.ingestion_job_id) if doc.ingestion_job_id else None,
+            "extracted_tasks": [
+                {"title": t.title, "assignee": t.assignee, "due_date": t.due_date}
+                for t in doc.extracted_tasks
+            ],
         },
         "ingestion_job_id": str(doc.ingestion_job_id) if doc.ingestion_job_id else None,
         "created_at": doc.created_at,
@@ -347,6 +351,15 @@ def _row_to_domain(row: DocumentRow) -> Document:
     job_id_str = meta.get("ingestion_job_id") or (
         str(row.ingestion_job_id) if row.ingestion_job_id else None
     )
+    extracted_tasks = tuple(
+        ExtractedMeetingTask(
+            title=t["title"],
+            assignee=t.get("assignee"),
+            due_date=t.get("due_date"),
+        )
+        for t in meta.get("extracted_tasks", [])
+        if isinstance(t, dict) and t.get("title")
+    )
 
     return Document(
         id=DocumentId(row.id),
@@ -359,6 +372,7 @@ def _row_to_domain(row: DocumentRow) -> Document:
         ingestion_job_id=IngestionJobId(job_id_str) if job_id_str else None,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        extracted_tasks=extracted_tasks,
     )
 
 

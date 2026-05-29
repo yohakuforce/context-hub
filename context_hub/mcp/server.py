@@ -462,7 +462,14 @@ async def _tool_get_meeting(args: dict[str, object]) -> dict[str, object]:
             "rawTranscript": doc.raw_content.text,
             "summary": summary,
             "decisions": [],
-            "extractedTasks": [],
+            "extractedTasks": [
+                {
+                    "title": t.title,
+                    "suggestedAssignee": t.assignee,
+                    "suggestedDueDate": t.due_date,
+                }
+                for t in doc.extracted_tasks
+            ],
         }
     except Exception as exc:  # noqa: BLE001
         sys.stderr.write(f"get_meeting failed: {exc}\n")

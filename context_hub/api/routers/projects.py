@@ -18,6 +18,7 @@ from context_hub.api.dependencies import get_document_repo, get_issue_repo, get_
 from context_hub.api.middleware.auth import require_scope
 from context_hub.api.schemas.common import ApiResponse, PaginatedMeta
 from context_hub.api.schemas.projects import (
+    ExtractedTask,
     MeetingDetailResponse,
     MeetingsResponse,
     MeetingSnippetResponse,
@@ -217,7 +218,14 @@ async def get_meeting(
                 doc.structured_content.summary if doc.structured_content else ""
             ),
             decisions=[],
-            extracted_tasks=[],
+            extracted_tasks=[
+                ExtractedTask(
+                    title=t.title,
+                    suggested_assignee=t.assignee,
+                    suggested_due_date=t.due_date,
+                )
+                for t in doc.extracted_tasks
+            ],
         )
     )
 

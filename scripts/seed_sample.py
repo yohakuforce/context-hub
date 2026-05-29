@@ -21,7 +21,7 @@ from datetime import date, datetime
 from context_hub.adapters.sqlite.document_repository import SqliteDocumentRepository
 from context_hub.adapters.sqlite.issue_repository import SqliteIssueRepository
 from context_hub.adapters.sqlite.project_repository import SqliteProjectRepository
-from context_hub.domain.document.entities import Document
+from context_hub.domain.document.entities import Document, ExtractedMeetingTask
 from context_hub.domain.issue.entities import Issue
 from context_hub.domain.project.entities import Project, SourceConfig
 from context_hub.shared.types import (
@@ -39,6 +39,7 @@ from context_hub.shared.types import (
 DB_PATH = os.environ.get("CH_SQLITE_DB", "./data/context_hub.db")
 PROJECT_ID = ProjectId("proj-001")
 EXTERNAL_PROJECT_ID = "DEMO"
+MEETING_DOC_ID = DocumentId("meeting-demo-001")
 
 MEETING_TRANSCRIPT = """\
 【定例MTG 議事録（マスク済みサンプル）】
@@ -98,12 +99,34 @@ def build_meeting() -> Document:
             created_at=now,
         ),
     )
-    return doc.with_structured_content(
+    # Use a stable document id so demos can reference the meeting directly.
+    doc = Document(
+        id=MEETING_DOC_ID,
+        project_id=doc.project_id,
+        source_type=doc.source_type,
+        external_id=doc.external_id,
+        raw_content=doc.raw_content,
+        structured_content=doc.structured_content,
+        embedding_vector=doc.embedding_vector,
+        ingestion_job_id=doc.ingestion_job_id,
+        created_at=doc.created_at,
+        updated_at=doc.updated_at,
+    )
+    doc = doc.with_structured_content(
         StructuredContent(
             summary="認証基盤リプレースを最優先に決定。マイグレーション失敗の原因調査が課題。",
             language="ja",
             tags=("認証", "マイグレーション", "UI"),
             entities=(),
+        )
+    )
+    # Tasks the on-prem LLM would extract from this transcript (persisted so the
+    # 会議→タスク自動生成 path is deterministic in the demo without a live LLM).
+    return doc.with_extracted_tasks(
+        (
+            ExtractedMeetingTask(title="認証APIの新スキーマ設計レビュー", assignee="メンバーA", due_date="2026-06-03"),
+            ExtractedMeetingTask(title="マイグレーション失敗の根本原因特定", assignee="メンバーB", due_date="2026-06-02"),
+            ExtractedMeetingTask(title="設定画面UIモック提出", assignee="メンバーC", due_date="2026-06-02"),
         )
     )
 

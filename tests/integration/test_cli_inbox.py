@@ -71,6 +71,11 @@ def cli_env(tmp_sqlite_db: Path, inbox_dir: Path, monkeypatch):
     )
     monkeypatch.setenv("CH_INBOX_DIR", str(inbox_dir))
     monkeypatch.setenv("EMBEDDING_PROVIDER", "mock")
+    # get_profile_settings() is lru_cached; clear it so the CLI picks up the temp
+    # CH_SQLITE_DB above instead of a stale ./data path cached by an earlier test.
+    # Without this the inbox CLI writes to the real ./data DB (test-isolation leak).
+    from context_hub.config.profiles import get_profile_settings
+    get_profile_settings.cache_clear()
     # Rebuild the legacy-settings singleton so it picks up the freshly-set env vars.
     # Quirk: `context_hub.config` re-exports the Settings *instance* under the same
     # name as the submodule, so we have to fetch the actual module from sys.modules.
@@ -86,6 +91,8 @@ def cli_env(tmp_sqlite_db: Path, inbox_dir: Path, monkeypatch):
         # Restore so other tests see the production singleton again.
         sys.modules["context_hub.config.settings"].settings = original_singleton  # type: ignore[attr-defined]
         sys.modules["context_hub.config"].settings = original_singleton  # type: ignore[attr-defined]
+        # Drop the temp-DB settings from the cache so later tests don't inherit it.
+        get_profile_settings.cache_clear()
 
 
 class TestCliIngestInbox:
