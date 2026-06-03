@@ -18,8 +18,12 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from typing import TYPE_CHECKING
 
 from context_hub.mcp import MCP_PROTOCOL_VERSION
+
+if TYPE_CHECKING:
+    from context_hub.domain.document.entities import Document
 
 # JSON-RPC request/response IDs can be str, int, or None per the spec.
 _RequestId = str | int | None
@@ -355,10 +359,14 @@ async def _tool_get_project_context(args: dict[str, object]) -> dict[str, object
         issue_count = await issue_repo.count_by_project(pid)
         active_sources = [s.source_type.value for s in project.sources if s.is_enabled]
 
+        summary = (
+            f"Project '{project.name}' has {doc_count} documents "
+            f"and {issue_count} issues."
+        )
         return {
             "projectId": project_id,
             "name": project.name,
-            "summary": f"Project '{project.name}' has {doc_count} documents and {issue_count} issues.",
+            "summary": summary,
             "activeSources": active_sources,
             "documentCount": doc_count,
             "issueCount": issue_count,
@@ -411,9 +419,11 @@ async def _tool_get_members(args: dict[str, object]) -> dict[str, object]:
                     if issue.source_type.value not in sources:
                         sources = [*sources, issue.source_type.value]
                     member_map[key] = {**member_map[key], "sources": sources}
+                count = member_map[key]["assignedIssueCount"]
+                assert isinstance(count, int)
                 member_map[key] = {
                     **member_map[key],
-                    "assignedIssueCount": int(member_map[key]["assignedIssueCount"]) + 1,
+                    "assignedIssueCount": count + 1,
                 }
 
         return {"members": list(member_map.values())}
@@ -617,7 +627,7 @@ async def _tool_get_issue_detail(args: dict[str, object]) -> dict[str, object]:
         return {"error": "get_issue_detail failed. See server logs for details."}
 
 
-def _mcp_derive_title(doc: object) -> str:
+def _mcp_derive_title(doc: Document) -> str:
     """Derive a display title from a document (mirrors _derive_title in projects router).
 
     Args:
@@ -626,11 +636,11 @@ def _mcp_derive_title(doc: object) -> str:
     Returns:
         A short title string (at most 80 characters).
     """
-    if doc.structured_content and doc.structured_content.summary:  # type: ignore[union-attr]
-        return doc.structured_content.summary[:80]  # type: ignore[union-attr]
-    raw = doc.raw_content.text or ""  # type: ignore[union-attr]
+    if doc.structured_content and doc.structured_content.summary:
+        return doc.structured_content.summary[:80]
+    raw = doc.raw_content.text or ""
     first_line = raw.split("\n")[0].strip()
-    return first_line[:80] if first_line else f"[{doc.source_type.value}]"  # type: ignore[union-attr]
+    return first_line[:80] if first_line else f"[{doc.source_type.value}]"
 
 
 # ---------------------------------------------------------------------------
