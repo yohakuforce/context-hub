@@ -9,7 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+_No unreleased changes yet._
+
+---
+
+## [0.3.0] - 2026-06-03
+
+### Added — Admin GUI & serve-resident automation
 
 - **Admin GUI at `/admin`** — a server-rendered, build-free console to configure
   everything that previously required `.env`/CLI edits, with three tabs:
@@ -56,10 +62,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Docs corrected**: `context-hub serve` has no `--http-only` flag — default is
   the HTTP REST API, `--mcp-only` runs the stdio MCP server. README / architecture
   docs updated to match the actual CLI.
-
----
-
-## [0.3.0] - 2026-05-30
 
 ### Changed — BREAKING: REST 応答が camelCase に統一
 
