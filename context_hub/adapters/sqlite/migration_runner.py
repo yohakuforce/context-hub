@@ -14,7 +14,7 @@ import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 
-from context_hub.adapters.sqlite.session import open_connection
+from context_hub.adapters.sqlite.session import open_connection, vec_extension_available
 
 # Default path for the bundled SQLite schema files. Lives inside the package
 # so it ships with the wheel (was previously at the repo-root `schema/sqlite/`,
@@ -155,10 +155,16 @@ class SqliteMigrationRunner:
         sql = path.read_text(encoding="utf-8")
         statements = [s.strip() for s in sql.split(";") if s.strip()]
         applied_at = datetime.now(tz=UTC).isoformat()
+        # In degraded FTS-only mode (no sqlite-vec), skip vec0 virtual tables —
+        # they cannot be created without the extension. Everything else (incl.
+        # the FTS5 index) is created so ingestion and keyword search still work.
+        vec_ok = vec_extension_available()
         with open_connection(self._db_path) as conn:
             try:
                 conn.execute("BEGIN")
                 for statement in statements:
+                    if not vec_ok and "using vec0" in statement.lower():
+                        continue
                     conn.execute(statement)
                 conn.execute(
                     "INSERT OR IGNORE INTO schema_migrations (revision, applied_at) "

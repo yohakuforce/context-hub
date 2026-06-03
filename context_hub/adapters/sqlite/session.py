@@ -9,12 +9,65 @@ keeping the event loop unblocked while retaining the synchronous SQLite API.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
+import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
 import sqlite_vec
+
+logger = logging.getLogger(__name__)
+
+# Cached result of probing whether this interpreter can load the sqlite-vec
+# extension. None = not probed yet. See vec_extension_available().
+_vec_available: bool | None = None
+_vec_probe_lock = threading.Lock()
+
+
+def vec_extension_available() -> bool:
+    """Return True if sqlite-vec (vec0) can be loaded in this Python interpreter.
+
+    The result is probed once (against an in-memory DB) and cached. It is False
+    when the interpreter's bundled ``sqlite3`` was compiled without loadable
+    extension support — notably the official **python.org Windows** builds, where
+    ``Connection.enable_load_extension`` is unavailable. On such interpreters
+    Context-Hub runs in **degraded FTS-only mode**: ingestion and keyword search
+    work, but semantic (vector) search is disabled.
+
+    To get full semantic search on Windows, either use a Python with loadable
+    extensions (e.g. conda / miniforge) or run the PostgreSQL ``production``
+    profile, which uses pgvector instead of sqlite-vec.
+    """
+    global _vec_available
+    if _vec_available is not None:
+        return _vec_available
+    with _vec_probe_lock:
+        if _vec_available is not None:
+            return _vec_available
+        probe = sqlite3.connect(":memory:")
+        try:
+            probe.enable_load_extension(True)
+            sqlite_vec.load(probe)
+            probe.enable_load_extension(False)
+            _vec_available = True
+        except Exception as exc:  # noqa: BLE001 — any failure ⇒ degrade, don't crash
+            _vec_available = False
+            logger.warning(
+                "sqlite_vec_unavailable",
+                extra={"error": str(exc)},
+            )
+            logger.warning(
+                "Context-Hub is running in degraded FTS-only mode: semantic "
+                "(vector) search is disabled because this Python cannot load the "
+                "sqlite-vec extension. Keyword search and ingestion work normally. "
+                "For full semantic search use a Python with loadable sqlite "
+                "extensions (e.g. conda/miniforge) or the PostgreSQL production profile."
+            )
+        finally:
+            probe.close()
+    return _vec_available
 
 
 def _apply_connection_settings(conn: sqlite3.Connection) -> None:
@@ -32,16 +85,21 @@ def _apply_connection_settings(conn: sqlite3.Connection) -> None:
 
 
 def load_sqlite_vec(conn: sqlite3.Connection) -> None:
-    """Load the sqlite-vec extension into *conn*.
+    """Load the sqlite-vec extension into *conn*, if this interpreter supports it.
 
-    Must be called before any vec0 virtual table operations.
+    When the extension cannot be loaded (see :func:`vec_extension_available`),
+    this is a no-op and the connection is usable for everything except vec0
+    virtual tables — Context-Hub then operates in degraded FTS-only mode.
 
     Args:
-        conn: Open SQLite connection with extension loading enabled.
+        conn: Open SQLite connection.
 
     Raises:
-        RuntimeError: If sqlite-vec fails to load.
+        RuntimeError: Only if the extension is reported available yet fails to
+            load on this connection (an unexpected, genuinely broken install).
     """
+    if not vec_extension_available():
+        return
     try:
         conn.enable_load_extension(True)
         sqlite_vec.load(conn)

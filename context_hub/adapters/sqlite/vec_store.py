@@ -23,7 +23,7 @@ from typing import Any
 
 import numpy as np
 
-from context_hub.adapters.sqlite.session import open_connection
+from context_hub.adapters.sqlite.session import open_connection, vec_extension_available
 from context_hub.core.vectorstore import HealthState, HealthStatus, MetaFilter, ScoredId
 
 # sqlite-vec stores vectors as binary blobs; this is the expected dimension.
@@ -72,6 +72,9 @@ class SqliteVecStore:
         Raises:
             ValueError: If embedding dimension != 1024.
         """
+        # Degraded FTS-only mode (no sqlite-vec): nothing to store.
+        if not vec_extension_available():
+            return
         _validate_embedding(embedding)
         blob = _to_blob(embedding)
         meta_json = json.dumps(meta)
@@ -100,6 +103,9 @@ class SqliteVecStore:
         Raises:
             ValueError: If query dimension != 1024.
         """
+        # Degraded FTS-only mode (no sqlite-vec): no vector results.
+        if not vec_extension_available():
+            return []
         _validate_embedding(query)
         blob = _to_blob(query)
         capped_k = min(k, _MAX_K)
@@ -116,14 +122,23 @@ class SqliteVecStore:
         Args:
             doc_id: Document identifier to remove.
         """
+        if not vec_extension_available():
+            return
         await asyncio.to_thread(self._sync_delete, doc_id)
 
     async def health_check(self) -> HealthStatus:
         """Verify the vec0 virtual table is accessible.
 
         Returns:
-            HealthStatus with state OK or UNAVAILABLE.
+            HealthStatus with state OK or UNAVAILABLE. Reports UNAVAILABLE with a
+            clear reason when running in degraded FTS-only mode (no sqlite-vec).
         """
+        if not vec_extension_available():
+            return HealthStatus(
+                state=HealthState.UNAVAILABLE,
+                detail="sqlite-vec extension unavailable — running FTS-only "
+                "(semantic search disabled).",
+            )
         try:
             await asyncio.to_thread(self._sync_health_check)
             return HealthStatus(state=HealthState.OK)

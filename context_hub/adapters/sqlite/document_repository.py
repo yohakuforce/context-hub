@@ -20,7 +20,7 @@ from typing import Any, cast
 
 import numpy as np
 
-from context_hub.adapters.sqlite.session import open_connection
+from context_hub.adapters.sqlite.session import open_connection, vec_extension_available
 from context_hub.core.vectorstore import ScoredId
 from context_hub.domain.document.entities import Document, ExtractedMeetingTask
 from context_hub.domain.document.repository import DocumentRepository
@@ -363,7 +363,13 @@ class SqliteDocumentRepository(DocumentRepository):
         k: int,
         source_types: list[SourceType] | None,
     ) -> list[tuple[str, float]]:
-        """Execute sqlite-vec KNN search. Returns (doc_id, score) pairs."""
+        """Execute sqlite-vec KNN search. Returns (doc_id, score) pairs.
+
+        Returns an empty list in degraded FTS-only mode (no sqlite-vec), so
+        hybrid_search transparently falls back to keyword-only ranking.
+        """
+        if not vec_extension_available():
+            return []
         blob = query.astype(np.float32).tobytes()
         with open_connection(self._db_path) as conn:
             # Fetch more candidates than needed; filter by project_id afterwards.
@@ -451,8 +457,9 @@ class SqliteDocumentRepository(DocumentRepository):
                 ),
             )
 
-            # Upsert embedding if present.
-            if values["embedding"] is not None:
+            # Upsert embedding if present — skipped in degraded FTS-only mode,
+            # where the document_embeddings vec0 table does not exist.
+            if values["embedding"] is not None and vec_extension_available():
                 conn.execute(
                     "DELETE FROM document_embeddings WHERE doc_id = ?",
                     (values["id"],),

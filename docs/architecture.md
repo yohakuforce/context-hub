@@ -113,9 +113,8 @@ Claude Desktop / Claude Code
 can verify compatibility at startup without opening the stdio channel.
 
 **CLI flags**:
-- `context-hub serve` — both HTTP + MCP (default)
-- `context-hub serve --mcp-only` — MCP stdio only, no HTTP
-- `context-hub serve --http-only` — HTTP only, no MCP
+- `context-hub serve` — HTTP REST API server (default)
+- `context-hub serve --mcp-only` — MCP stdio server instead of HTTP
 
 ---
 
