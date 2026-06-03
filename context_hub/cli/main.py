@@ -15,7 +15,16 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
+
+if TYPE_CHECKING:
+    from context_hub.domain.document.repository import DocumentRepository
+    from context_hub.domain.ingestion.repository import IngestionJobRepository
+    from context_hub.domain.issue.repository import IssueRepository
+    from context_hub.domain.project.entities import Project
+    from context_hub.domain.project.repository import ProjectRepository
+    from context_hub.infrastructure.embedding.base import EmbeddingProvider
+    from context_hub.shared.types import SourceType
 
 import typer
 
@@ -32,7 +41,22 @@ app = typer.Typer(
 
 PROFILES = ("quickstart", "personal", "production")
 SOURCES = ("slack", "backlog", "redmine", "gmail", "inbox")
+# `all` is an aggregate target: sync every enabled source in one command.
+INGEST_TARGETS = (*SOURCES, "all")
 INGEST_MODES = ("mock", "live")
+
+# Maps a configured SourceConfig.source_type to the CLI source string that
+# _build_adapter understands (EMAIL is exposed on the CLI as "gmail").
+def _source_type_to_cli() -> dict[SourceType, str]:
+    """Return the {SourceType: cli_source} map (lazy import keeps CLI startup fast)."""
+    from context_hub.shared.types import SourceType
+
+    return {
+        SourceType.SLACK: "slack",
+        SourceType.BACKLOG: "backlog",
+        SourceType.REDMINE: "redmine",
+        SourceType.EMAIL: "gmail",
+    }
 
 _ENV_EXAMPLE_BASE = Path(__file__).parent.parent / "_env_examples"
 
@@ -205,7 +229,9 @@ def serve(
 def ingest(
     source: Annotated[
         str,
-        typer.Argument(help="Data source to ingest: slack | backlog | redmine."),
+        typer.Argument(
+            help="Data source to ingest: slack | backlog | redmine | gmail | inbox | all."
+        ),
     ],
     mode: Annotated[
         str,
@@ -232,15 +258,18 @@ def ingest(
       gmail    — Fetch labelled messages from Gmail (requires [gmail] extra in live mode).
       inbox    — Scan the local inbox folder (CH_INBOX_DIR) once and upsert any new
                  or edited .md / .txt files. --mode is ignored for inbox.
+      all      — Sync EVERY enabled source for the project in one run, then scan the
+                 inbox folder if CH_INBOX_DIR is set. A failure in one source is logged
+                 and the others continue. Ideal for a single scheduled (launchd/cron) job.
 
     Modes:
       mock  — Use fixture data (no real API keys required).
       live  — Call the real API using credentials from .env.
     """
-    if source not in SOURCES:
+    if source not in INGEST_TARGETS:
         typer.echo(
             f"Error: unknown source '{source}'. "
-            f"Valid options: {', '.join(SOURCES)}",
+            f"Valid options: {', '.join(INGEST_TARGETS)}",
             err=True,
         )
         raise typer.Exit(code=1)
@@ -300,6 +329,19 @@ async def _run_ingest(source: str, mode: str, project_id: str | None) -> None:
         await _run_inbox_ingest(project_repo, document_repo, embedding_provider, project_id)
         return
 
+    if source == "all":
+        await _run_ingest_all(
+            mode=mode,
+            project_id=project_id,
+            settings=settings,
+            embedding_provider=embedding_provider,
+            project_repo=project_repo,
+            document_repo=document_repo,
+            issue_repo=issue_repo,
+            job_repo=job_repo,
+        )
+        return
+
     resolved_pid = project_id
     if resolved_pid is None:
         projects = await project_repo.find_all()
@@ -326,6 +368,119 @@ async def _run_ingest(source: str, mode: str, project_id: str | None) -> None:
     )
     await service.run(project_id=ProjectId(resolved_pid))
     typer.echo(f"Ingestion complete. source='{source}', project_id={resolved_pid!r}")
+
+
+async def _run_ingest_all(
+    *,
+    mode: str,
+    project_id: str | None,
+    settings: object,
+    embedding_provider: EmbeddingProvider,
+    project_repo: ProjectRepository,
+    document_repo: DocumentRepository,
+    issue_repo: IssueRepository,
+    job_repo: IngestionJobRepository,
+) -> None:
+    """Sync every enabled source for one project in a single run.
+
+    Resolves the target project (explicit ``project_id`` or the sole/first project),
+    then ingests each enabled external source (Slack / Backlog / Redmine / Gmail) and,
+    when ``CH_INBOX_DIR`` is set, scans the inbox folder. A failure in any single source
+    is logged and the run continues — so one bad credential never blocks the rest. This
+    is the entry point intended for a scheduled launchd / cron job.
+
+    Args:
+        mode:              Ingest mode (mock | live) passed to each adapter.
+        project_id:        Explicit project UUID, or None to use the sole/first project.
+        settings:          ProfileSettings instance.
+        embedding_provider: Embedding provider shared across all sources.
+        project_repo / document_repo / issue_repo / job_repo: Repositories (SQLite).
+    """
+    from context_hub.application.ingestion_service import IngestionService
+    from context_hub.infrastructure.adapters.base import SourceAdapter
+    from context_hub.shared.types import ProjectId
+
+    project = await _resolve_project_for_ingest(project_repo, project_id)
+    resolved_pid = str(project.id)
+    type_to_cli = _source_type_to_cli()
+
+    enabled = project.active_sources()
+    external = [s for s in enabled if s.source_type in type_to_cli]
+
+    typer.echo(
+        f"Ingest-all: project_id={resolved_pid!r}, "
+        f"{len(external)} enabled source(s), mode={mode}."
+    )
+
+    succeeded = 0
+    failed = 0
+    for source_config in external:
+        cli_source = type_to_cli[source_config.source_type]
+        try:
+            adapter: SourceAdapter = _build_adapter(  # type: ignore[assignment]
+                source=cli_source, mode=mode, settings=settings
+            )
+            service = IngestionService(
+                adapter=adapter,
+                embedding_provider=embedding_provider,
+                job_repo=job_repo,
+                document_repo=document_repo,
+                issue_repo=issue_repo,
+            )
+            job = await service.run(project_id=ProjectId(resolved_pid))
+            succeeded += 1
+            typer.echo(
+                f"  + {cli_source}: status={job.status.value} items={job.items_processed}"
+            )
+        except Exception as exc:  # noqa: BLE001 — one bad source must not abort the rest
+            failed += 1
+            typer.echo(f"  ! {cli_source}: {exc}", err=True)
+
+    # Inbox is not a SourceConfig; scan it too when configured (best-effort).
+    from context_hub.config import settings as legacy_settings
+
+    if getattr(legacy_settings, "ch_inbox_dir", None):
+        try:
+            await _run_inbox_ingest(
+                project_repo, document_repo, embedding_provider, project_id
+            )
+        except Exception as exc:  # noqa: BLE001 — keep the summary line truthful
+            failed += 1
+            typer.echo(f"  ! inbox: {exc}", err=True)
+
+    if not external and not getattr(legacy_settings, "ch_inbox_dir", None):
+        typer.echo(
+            "Note: no enabled sources and no CH_INBOX_DIR configured — nothing to ingest. "
+            "Add sources via POST /api/v1/projects or set CH_INBOX_DIR in .env."
+        )
+
+    typer.echo(
+        f"Ingest-all complete. project_id={resolved_pid!r} "
+        f"succeeded={succeeded} failed={failed}"
+    )
+
+
+async def _resolve_project_for_ingest(
+    project_repo: ProjectRepository, project_id: str | None
+) -> Project:
+    """Return the target Project: explicit id, else the sole/first project. Exit 1 if none."""
+    from context_hub.shared.types import ProjectId
+
+    if project_id is not None:
+        project = await project_repo.find_by_id(ProjectId(project_id))
+        if project is None:
+            typer.echo(f"Error: project {project_id!r} not found.", err=True)
+            raise typer.Exit(code=1)
+        return project
+
+    projects = await project_repo.find_all()
+    if not projects:
+        typer.echo(
+            "Error: no projects found. Create a project first via POST /api/v1/projects.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    return projects[0]
 
 
 async def _run_inbox_ingest(

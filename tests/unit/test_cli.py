@@ -848,6 +848,161 @@ class TestIngestAdditionalPaths:
         assert code == 1
 
 
+class TestIngestAll:
+    """`context-hub ingest all` — one command that syncs every enabled source."""
+
+    def test_ingest_all_target_accepted(self) -> None:
+        """`ingest all --mode mock` should pass validation and invoke asyncio.run."""
+        with patch("asyncio.run", side_effect=lambda coro: coro.close()):
+            result = runner.invoke(app, ["ingest", "all", "--mode", "mock"])
+        assert result.exit_code == 0
+
+    @pytest.mark.asyncio
+    async def test_run_ingest_all_runs_each_enabled_external_source(self) -> None:
+        """_run_ingest_all builds an adapter and runs ingestion for every enabled
+        external source, mapping EMAIL→gmail, and skips non-adapter types (MEETING)."""
+        from context_hub.cli.main import _run_ingest_all
+        from context_hub.shared.types import SourceType
+
+        sc_slack = MagicMock(source_type=SourceType.SLACK, is_enabled=True)
+        sc_email = MagicMock(source_type=SourceType.EMAIL, is_enabled=True)
+        sc_meeting = MagicMock(source_type=SourceType.MEETING, is_enabled=True)
+
+        project = MagicMock()
+        project.id = "proj-uuid-1"
+        project.active_sources.return_value = [sc_slack, sc_email, sc_meeting]
+
+        project_repo = AsyncMock()
+        project_repo.find_all.return_value = [project]
+
+        job = MagicMock()
+        job.status.value = "completed"
+        job.items_processed = 3
+        mock_service = AsyncMock()
+        mock_service.run.return_value = job
+
+        mock_ingest_module = MagicMock()
+        mock_ingest_module.IngestionService = MagicMock(return_value=mock_service)
+
+        mock_config_module = MagicMock()
+        mock_config_module.settings = MagicMock(ch_inbox_dir=None)
+
+        built_sources: list[str] = []
+
+        def fake_build_adapter(*, source: str, mode: str, settings: object) -> object:
+            built_sources.append(source)
+            return MagicMock()
+
+        with patch.dict(
+            sys.modules,
+            {
+                "context_hub.application.ingestion_service": mock_ingest_module,
+                "context_hub.config": mock_config_module,
+            },
+        ), patch("context_hub.cli.main._build_adapter", side_effect=fake_build_adapter):
+            await _run_ingest_all(
+                mode="mock",
+                project_id=None,
+                settings=_mock_settings(),
+                embedding_provider=MagicMock(),
+                project_repo=project_repo,
+                document_repo=MagicMock(),
+                issue_repo=MagicMock(),
+                job_repo=MagicMock(),
+            )
+
+        assert built_sources == ["slack", "gmail"]
+        assert mock_service.run.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_run_ingest_all_continues_on_source_failure(self) -> None:
+        """A failure in one source must not abort the others (no exception raised)."""
+        from context_hub.cli.main import _run_ingest_all
+        from context_hub.shared.types import SourceType
+
+        sc_slack = MagicMock(source_type=SourceType.SLACK, is_enabled=True)
+        sc_backlog = MagicMock(source_type=SourceType.BACKLOG, is_enabled=True)
+
+        project = MagicMock()
+        project.id = "proj-uuid-1"
+        project.active_sources.return_value = [sc_slack, sc_backlog]
+
+        project_repo = AsyncMock()
+        project_repo.find_all.return_value = [project]
+
+        mock_service = AsyncMock()
+        mock_service.run.return_value = MagicMock(
+            status=MagicMock(value="completed"), items_processed=1
+        )
+
+        mock_ingest_module = MagicMock()
+        mock_ingest_module.IngestionService = MagicMock(return_value=mock_service)
+
+        mock_config_module = MagicMock()
+        mock_config_module.settings = MagicMock(ch_inbox_dir=None)
+
+        # First adapter (slack) raises; second (backlog) succeeds.
+        def flaky_build_adapter(*, source: str, mode: str, settings: object) -> object:
+            if source == "slack":
+                raise RuntimeError("slack token missing")
+            return MagicMock()
+
+        with patch.dict(
+            sys.modules,
+            {
+                "context_hub.application.ingestion_service": mock_ingest_module,
+                "context_hub.config": mock_config_module,
+            },
+        ), patch("context_hub.cli.main._build_adapter", side_effect=flaky_build_adapter):
+            # Must not raise despite the slack failure.
+            await _run_ingest_all(
+                mode="mock",
+                project_id=None,
+                settings=_mock_settings(),
+                embedding_provider=MagicMock(),
+                project_repo=project_repo,
+                document_repo=MagicMock(),
+                issue_repo=MagicMock(),
+                job_repo=MagicMock(),
+            )
+
+        # Only backlog completed a run.
+        assert mock_service.run.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_run_ingest_all_no_projects_exits_nonzero(self) -> None:
+        """_run_ingest_all should exit 1 when no projects exist and project_id is None."""
+        import click
+
+        from context_hub.cli.main import _run_ingest_all
+
+        project_repo = AsyncMock()
+        project_repo.find_all.return_value = []
+
+        mock_config_module = MagicMock()
+        mock_config_module.settings = MagicMock(ch_inbox_dir=None)
+
+        with patch.dict(sys.modules, {"context_hub.config": mock_config_module}):
+            with pytest.raises((click.exceptions.Exit, SystemExit)) as exc_info:
+                await _run_ingest_all(
+                    mode="mock",
+                    project_id=None,
+                    settings=_mock_settings(),
+                    embedding_provider=MagicMock(),
+                    project_repo=project_repo,
+                    document_repo=MagicMock(),
+                    issue_repo=MagicMock(),
+                    job_repo=MagicMock(),
+                )
+
+        code = (
+            exc_info.value.exit_code
+            if isinstance(exc_info.value, click.exceptions.Exit)
+            else exc_info.value.code
+        )
+        assert code == 1
+
+
 class TestQueryAdditionalPaths:
     """C-1 coverage: _run_query JSON output and no-projects error."""
 

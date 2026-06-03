@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd agent: run `context-hub ingest all` on a fixed interval.
+
+  This is the recommended way to keep ONE Context-Hub project instance in sync
+  on a Mac (e.g. a Mac mini) WITHOUT keeping `context-hub serve` running. It
+  pulls every enabled source (Slack / Backlog / Redmine / Gmail) plus the inbox
+  folder in a single run; a failure in one source is logged and the others
+  continue.
+
+  ─── Setup ─────────────────────────────────────────────────────────────────
+  1. Edit the THREE placeholders below:
+       __CONTEXT_HUB_BIN__   absolute path to the context-hub executable
+                             (find it with: `which context-hub`)
+       __PROJECT_DIR__       the instance working directory that holds .env + data/
+       __CH_PROFILE__        personal | production  (use the profile you init'd)
+  2. Copy this file (rename per instance if you run several) to:
+       ~/Library/LaunchAgents/com.yohakuforce.context-hub.ingest.plist
+  3. Load it:
+       launchctl load -w ~/Library/LaunchAgents/com.yohakuforce.context-hub.ingest.plist
+  4. Run once immediately to verify:
+       launchctl start com.yohakuforce.context-hub.ingest
+       tail -f __PROJECT_DIR__/logs/ingest.out.log
+
+  Per-instance tip: run one agent per project. Give each a unique Label
+  (…​.ingest.clientA / .clientB) and its own __PROJECT_DIR__.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.yohakuforce.context-hub.ingest</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__CONTEXT_HUB_BIN__</string>
+        <string>ingest</string>
+        <string>all</string>
+        <string>--mode</string>
+        <string>live</string>
+    </array>
+
+    <!-- The instance dir that contains .env and data/ — sources & DB live here. -->
+    <key>WorkingDirectory</key>
+    <string>__PROJECT_DIR__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CH_PROFILE</key>
+        <string>__CH_PROFILE__</string>
+        <key>INGEST_MODE</key>
+        <string>live</string>
+    </dict>
+
+    <!-- Every 15 minutes. Raise/lower to taste (seconds). -->
+    <key>StartInterval</key>
+    <integer>900</integer>
+
+    <!-- Run once at load so you don't wait a full interval for the first sync. -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Be a polite background job. -->
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>LowPriorityIO</key>
+    <true/>
+    <key>Nice</key>
+    <integer>5</integer>
+
+    <key>StandardOutPath</key>
+    <string>__PROJECT_DIR__/logs/ingest.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>__PROJECT_DIR__/logs/ingest.err.log</string>
+</dict>
+</plist>
