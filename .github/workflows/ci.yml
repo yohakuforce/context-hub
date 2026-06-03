@@ -14,10 +14,10 @@ jobs:
         python-version: ["3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -33,11 +33,12 @@ jobs:
         run: mypy context_hub/mcp context_hub/cli context_hub/config context_hub/core context_hub/adapters/sqlite context_hub/adapters/scheduler
 
       - name: Run tests
-        run: pytest tests/ -W error::RuntimeWarning --cov=context_hub --cov-report=term-missing --cov-fail-under=80
+        run: pytest tests/ -W error::RuntimeWarning --cov=context_hub --cov-report=term-missing --cov-report=xml --cov-fail-under=80
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: coverage-report
-          path: .coverage
+          path: coverage.xml
+          if-no-files-found: warn
