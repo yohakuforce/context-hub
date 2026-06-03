@@ -40,7 +40,7 @@ context-hub init --profile quickstart
 # Apply database schema
 context-hub migrate
 
-# Start server (HTTP + MCP stdio on the same process)
+# Start the HTTP REST API server (use --mcp-only for the stdio MCP server)
 context-hub serve
 ```
 
@@ -93,6 +93,60 @@ context-hub serve
 ```
 
 ---
+
+## Admin GUI
+
+Prefer clicking to editing `.env`? Start the server and open the admin console:
+
+```bash
+context-hub serve            # HTTP REST API (the admin UI rides on it)
+open http://127.0.0.1:8000/admin
+```
+
+It's a single server-rendered page (no build step), **in Japanese**, styled to
+match the yohakuforce docs (paper/crimson theme). Every setting has an inline,
+collapsible guide — **なぜ必要 (why) / 取得手順 (how to obtain) / 設定方法 (how to
+set)** — so you never have to leave the screen to figure out where a token comes
+from. Three tabs:
+
+- **Settings** — every connection setting and secret (Slack / Backlog / Redmine /
+  Gmail / LLM / embedding / DB / inbox …). Secrets are shown masked (last 4 chars);
+  saving writes `.env` and hot-reloads non-restart values. Fields that need a
+  restart are badged.
+- **Sources** — create projects and configure each source (enable, sync interval,
+  Slack channel IDs, Backlog/Redmine keys) without touching the database directly.
+  Each source has a **Test** button (readiness + a live ping for Slack/Redmine).
+- **Status** — profile, ingest mode, scheduler, auto-sync, vector-search vs
+  FTS-only, inbox folder, and per-project enabled sources.
+
+**Auth:** the page shell loads unauthenticated (bind to `127.0.0.1`), but every
+data call requires an **ADMIN** API key you paste once (stored in the browser).
+In development that's the `DEV_API_KEY` env value. The backing endpoints are
+`GET/PUT /api/v1/config`, `POST /api/v1/config/test/{source}`,
+`GET /api/v1/status`, and the project/source CRUD under `/api/v1/projects`.
+
+> Run the admin UI on localhost only. It reads and writes credentials.
+
+## Windows support
+
+Context-Hub runs on Windows. One platform nuance to know:
+
+- **`pip install` works** — all dependencies (including `sqlite-vec`) ship Windows wheels.
+- **SQLite profiles auto-degrade to FTS-only when needed.** The official
+  python.org Windows build of Python compiles `sqlite3` *without* loadable-extension
+  support, so the `sqlite-vec` extension can't load there. When that happens,
+  Context-Hub automatically runs in **FTS-only mode**: `migrate`, ingestion, and
+  **keyword search all work** — only semantic (vector) search is disabled. A clear
+  warning is logged at startup. (In the `quickstart` profile the default embedding
+  is a meaningless hash, so you lose nothing real there.)
+- **Want full semantic search on Windows?** Either:
+  1. Use a Python that has loadable sqlite extensions — **conda / miniforge** Python
+     does — then the SQLite profiles get full vector search; or
+  2. Use the **`production` profile (PostgreSQL + pgvector)**, which doesn't use
+     `sqlite-vec` at all and is fully featured on any Python.
+- **Scheduling:** use Windows Task Scheduler to run `context-hub ingest all`, or
+  just keep `context-hub serve` running (its built-in scheduler auto-syncs). See
+  [`examples/launchd/README.md`](examples/launchd/README.md) for the Task Scheduler recipe.
 
 ## Architecture Overview
 
@@ -266,12 +320,46 @@ CH_PROFILE=production
 ```
 context-hub init     --profile [quickstart|personal|production]
 context-hub migrate  [--dry-run] [--target HEAD] [--yes]
-context-hub serve    [--host 127.0.0.1] [--port 8000]
-                     [--mcp-only | --http-only]
-                     [--reload]
-context-hub ingest   [slack|backlog|redmine|gmail|inbox] [--mode mock|live]
+context-hub serve    [--host 127.0.0.1] [--port 8000] [--mcp-only] [--reload]
+                     # default: HTTP REST API. --mcp-only: stdio MCP server instead.
+context-hub ingest   [slack|backlog|redmine|gmail|inbox|all] [--mode mock|live]
 context-hub query    "<text>" [--top-k 5] [--json] [--project-id <uuid>]
 ```
+
+### One-shot full sync — `ingest all`
+
+`context-hub ingest all` syncs **every enabled source** for the project in a
+single run (Slack / Backlog / Redmine / Gmail), then scans the inbox folder when
+`CH_INBOX_DIR` is set. A failure in one source is logged and the rest continue,
+so one bad credential never blocks the others:
+
+```bash
+CH_PROFILE=personal INGEST_MODE=live context-hub ingest all
+# Ingest-all: project_id='…', 2 enabled source(s), mode=live.
+#   + slack: status=completed items=12
+#   + backlog: status=completed items=3
+# Ingest-all complete. project_id='…' succeeded=2 failed=0
+```
+
+This is the command to put on a schedule. See
+[`examples/launchd/`](examples/launchd/) for a ready-made launchd agent (macOS)
+that runs `ingest all` every 15 minutes, plus cron / systemd / Windows Task
+Scheduler equivalents.
+
+### Automatic background sync while `serve` runs
+
+You don't even need an external scheduler if you keep `context-hub serve`
+running: on startup it registers an interval job for **every enabled source** of
+every project and re-syncs each on its `syncInterval` (minimum 5 minutes). The
+inbox folder watcher runs the same way. This is on by default; disable it with:
+
+```bash
+CH_SOURCE_SYNC_ENABLED=false   # in .env or the environment
+```
+
+Pick **one** automation strategy: the built-in `serve` scheduler (simplest if the
+server is always up) **or** an external `ingest all` job (durable across reboots
+without keeping `serve` running). Running both just syncs twice.
 
 ---
 

@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Admin GUI at `/admin`** — a server-rendered, build-free console to configure
+  everything that previously required `.env`/CLI edits, with three tabs:
+  - **Settings**: read/write all connection settings & secrets via
+    `GET/PUT /api/v1/config`. Secrets are masked (last 4 chars); saving writes
+    `.env` and hot-reloads non-restart values; restart-required fields are flagged.
+  - **Sources**: project & source-config CRUD via new write endpoints
+    (`POST /api/v1/projects`, `PUT/DELETE /projects/{id}`,
+    `PUT/DELETE /projects/{id}/sources/{type}`, `GET /projects/detailed`) — fills
+    the gap where projects could previously only be created by direct repo calls.
+  - **Status**: `GET /api/v1/status` — profile, ingest mode, scheduler, auto-sync,
+    vector-vs-FTS-only, inbox, per-project enabled sources.
+  - **Connection test**: `POST /api/v1/config/test/{source}` — readiness check plus
+    a live ping for Slack (auth.test) and Redmine (users/current.json).
+  - All data endpoints require the ADMIN/WRITE scope; the page shell is localhost.
+
+
+- **`context-hub ingest all`**: one command that syncs every *enabled* source for
+  the project in a single run (Slack / Backlog / Redmine / Gmail), then scans the
+  inbox folder when `CH_INBOX_DIR` is set. Disabled sources and non-adapter types
+  (meeting/file) are skipped; a failure in one source is logged and the others
+  continue (no abort). Prints a per-source result and a `succeeded=/failed=`
+  summary. Intended as the single entry point for a scheduled job.
+- **`examples/launchd/`**: ready-made macOS launchd agent that runs
+  `context-hub ingest all` on a fixed interval (default 15 min) without requiring
+  a long-running `serve` process, plus cron / systemd / Windows Task Scheduler
+  equivalents.
+- **Serve-resident automatic source sync**: `context-hub serve` now registers an
+  APScheduler interval job for every *enabled* external source of every project
+  and re-syncs each on its `syncInterval` (min 5 min) — full automation without an
+  external scheduler. Toggle with `CH_SOURCE_SYNC_ENABLED` (default on). Job
+  failures are isolated and never crash the scheduler. (Previously the
+  per-source scheduler existed but was never wired into startup.)
+- **Windows support / graceful FTS-only fallback**: when the interpreter's
+  `sqlite3` cannot load the `sqlite-vec` extension (notably stock python.org
+  Windows builds), Context-Hub now runs in degraded **FTS-only mode** instead of
+  crashing — `migrate` skips the `vec0` table, ingestion and keyword search work,
+  and only semantic vector search is disabled (logged clearly at startup). Full
+  semantic search remains available via a conda/miniforge Python or the
+  PostgreSQL `production` profile.
+
+### Fixed
+
+- **Docs corrected**: `context-hub serve` has no `--http-only` flag — default is
+  the HTTP REST API, `--mcp-only` runs the stdio MCP server. README / architecture
+  docs updated to match the actual CLI.
+
+---
+
 ## [0.3.0] - 2026-05-30
 
 ### Changed — BREAKING: REST 応答が camelCase に統一
