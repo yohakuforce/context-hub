@@ -220,6 +220,15 @@ def serve(
     The server reads configuration from the .env file in the current working
     directory (or environment variables directly).
     """
+    # Load the .env in the current working directory into the process
+    # environment so values read via os.environ (e.g. DEV_API_KEY in the auth
+    # middleware) are honored when set in .env. We pass the cwd path explicitly:
+    # bare load_dotenv() searches upward from this source file, not the cwd where
+    # `init` wrote .env. Real environment variables take precedence.
+    from dotenv import load_dotenv
+
+    load_dotenv(Path.cwd() / ".env")
+
     if mcp_only:
         import asyncio
 

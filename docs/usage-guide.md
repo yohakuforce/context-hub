@@ -66,6 +66,18 @@ The console has three tabs:
 Everything here maps 1:1 to an `.env` key or REST endpoint — the GUI is a
 convenience layer, not a separate config store. CLI/`.env` and the GUI stay in sync.
 
+**Settings tab** — every config field with inline guides; secrets masked:
+
+![Context-Hub Admin — Settings tab](images/context-hub-admin-settings.png)
+
+**Sources tab** — per-project source config (enable / interval / keys) with a Test button:
+
+![Context-Hub Admin — Sources tab](images/context-hub-admin-sources.png)
+
+**Status tab** — profile, ingest mode, scheduler, auto-sync, search mode at a glance:
+
+![Context-Hub Admin — Status tab](images/context-hub-admin-status.png)
+
 > Run the admin UI on localhost only (`--host 127.0.0.1`). It reads and writes credentials.
 
 ---
