@@ -31,6 +31,23 @@ from context_hub.mcp import MCP_PROTOCOL_VERSION
 logger = structlog.get_logger()
 
 
+def _server_version() -> str:
+    """Resolve the installed package version (single source of truth).
+
+    Falls back to "0+unknown" when running from a source tree that was never
+    installed (e.g. some CI checkouts), so the endpoint never raises.
+    """
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("yohakuforce-context-hub")
+    except PackageNotFoundError:
+        return "0+unknown"
+
+
+SERVER_VERSION = _server_version()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Manage application startup and shutdown lifecycle.
@@ -386,7 +403,7 @@ def create_app() -> FastAPI:
         return {
             "mcp_protocol_version": MCP_PROTOCOL_VERSION,
             "server": "context-hub",
-            "server_version": "0.2.0",
+            "server_version": SERVER_VERSION,
         }
 
     return app

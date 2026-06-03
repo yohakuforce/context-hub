@@ -61,6 +61,30 @@ def _source_type_to_cli() -> dict[SourceType, str]:
 _ENV_EXAMPLE_BASE = Path(__file__).parent.parent / "_env_examples"
 
 
+def _ensure_dev_api_key(env_path: Path) -> str:
+    """Write a freshly generated DEV_API_KEY into the given .env file.
+
+    Replaces an existing ``DEV_API_KEY=`` line (blank or commented) if present,
+    otherwise appends one. Returns the generated key so the caller can display it.
+    """
+    import secrets
+
+    key = secrets.token_hex(24)
+    lines = env_path.read_text(encoding="utf-8").splitlines()
+    replaced = False
+    new_lines: list[str] = []
+    for line in lines:
+        if not replaced and line.lstrip("# ").startswith("DEV_API_KEY="):
+            new_lines.append(f"DEV_API_KEY={key}")
+            replaced = True
+        else:
+            new_lines.append(line)
+    if not replaced:
+        new_lines.append(f"DEV_API_KEY={key}")
+    env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    return key
+
+
 # ---------------------------------------------------------------------------
 # init
 # ---------------------------------------------------------------------------
@@ -124,9 +148,25 @@ def init(
     os.chmod(env_dest, 0o600)
     typer.echo(f"Wrote .env from profile '{profile}' (permissions: 600).")
 
+    # Development profiles (quickstart / personal) authenticate the Admin GUI
+    # (/admin) and all REST data calls with DEV_API_KEY. Generate a strong random
+    # value so the GUI works out of the box. Production ignores DEV_API_KEY and
+    # requires an issued consumer key with ADMIN scope instead (see SECURITY.md).
+    dev_api_key: str | None = None
+    if profile in ("quickstart", "personal"):
+        dev_api_key = _ensure_dev_api_key(env_dest)
+
     data_dir = Path("data")
     data_dir.mkdir(exist_ok=True)
     typer.echo("Ensured data/ directory exists.")
+
+    if dev_api_key is not None:
+        typer.echo("")
+        typer.echo(f"Admin GUI key (DEV_API_KEY): {dev_api_key}")
+        typer.echo(
+            "  Open the Admin GUI at http://127.0.0.1:8000/admin and paste this "
+            "key when prompted. It is also stored in your .env file."
+        )
 
     typer.echo("")
     typer.echo("Next steps:")
@@ -139,9 +179,11 @@ def init(
         typer.echo("  3. context-hub migrate && context-hub serve")
     else:
         typer.echo("  1. Edit .env and set DATABASE_URL, SECRET_KEY, and API keys.")
-        typer.echo("  2. pip install 'yohakuforce-context-hub[embedding]'")
-        typer.echo("  3. context-hub migrate")
-        typer.echo("  4. context-hub serve")
+        typer.echo("  2. Issue an ADMIN consumer key for the Admin GUI (see SECURITY.md);")
+        typer.echo("     DEV_API_KEY is ignored when APP_ENV=production.")
+        typer.echo("  3. pip install 'yohakuforce-context-hub[embedding]'")
+        typer.echo("  4. context-hub migrate")
+        typer.echo("  5. context-hub serve")
 
 
 # ---------------------------------------------------------------------------

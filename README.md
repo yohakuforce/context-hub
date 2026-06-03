@@ -49,11 +49,11 @@ Then query it:
 ```bash
 # REST
 curl http://127.0.0.1:8000/health
-# {"status":"ok","env":"development"}
+# {"status":"ok"}
 
 # MCP version check (used by AI-PM at startup)
 curl http://127.0.0.1:8000/mcp/version
-# {"mcp_protocol_version":"2024-11-05","server":"context-hub","server_version":"0.2.0"}
+# {"mcp_protocol_version":"2024-11-05","server":"context-hub","server_version":"0.3.0"}
 ```
 
 Add to Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
@@ -121,7 +121,12 @@ from. Three tabs:
 
 **Auth:** the page shell loads unauthenticated (bind to `127.0.0.1`), but every
 data call requires an **ADMIN** API key you paste once (stored in the browser).
-In development that's the `DEV_API_KEY` env value. The backing endpoints are
+In development (the `quickstart` / `personal` profiles) that's the `DEV_API_KEY`
+value — **`context-hub init` generates one for you and prints it** (it's also
+saved in your `.env`). Grab it from the `init` output, or run
+`grep DEV_API_KEY .env`, and paste it when the GUI prompts. In `production`
+(`APP_ENV=production`) `DEV_API_KEY` is ignored — mint an ADMIN consumer key
+instead (see [SECURITY.md](SECURITY.md)). The backing endpoints are
 `GET/PUT /api/v1/config`, `POST /api/v1/config/test/{source}`,
 `GET /api/v1/status`, and the project/source CRUD under `/api/v1/projects`.
 

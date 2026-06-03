@@ -38,6 +38,38 @@ The mock embedding is hash-based and gives meaningless semantic results — it e
 
 ---
 
+## 2.5 Configuring with the Admin GUI (no `.env` editing)
+
+If you'd rather click than edit `.env`, Context-Hub ships a server-rendered admin
+console — no build step, in Japanese, served on localhost.
+
+```bash
+context-hub serve            # the admin UI rides on the HTTP server
+open http://127.0.0.1:8000/admin
+```
+
+**Before you open it:** every data call in the GUI needs an **ADMIN** API key.
+In the `quickstart` / `personal` profiles that's the `DEV_API_KEY` value —
+`context-hub init` generates one and prints it (it's also in your `.env`; recover
+it any time with `grep DEV_API_KEY .env`). Paste it once when the page prompts;
+it's stored in your browser. In `production` (`APP_ENV=production`) `DEV_API_KEY`
+is ignored — issue an ADMIN consumer key instead (see [SECURITY.md](../SECURITY.md)).
+
+The console has three tabs:
+
+| Tab | What you do there |
+|---|---|
+| **Settings** | Read/write every connection setting and secret (Slack / Backlog / Redmine / Gmail / LLM / embedding / DB / inbox). Secrets show masked; saving writes `.env` and hot-reloads non-restart values. Each field has an inline **why / how to obtain / how to set** guide, so you never leave the screen to find where a token comes from. |
+| **Sources** | Create projects and configure each source (enable, sync interval, Slack channel IDs, Backlog/Redmine keys) without touching the database. Each source has a **Test** button (readiness + a live ping for Slack/Redmine). |
+| **Status** | Profile, ingest mode, scheduler, serve-resident auto-sync, vector-search vs FTS-only, inbox folder, and per-project enabled sources at a glance. |
+
+Everything here maps 1:1 to an `.env` key or REST endpoint — the GUI is a
+convenience layer, not a separate config store. CLI/`.env` and the GUI stay in sync.
+
+> Run the admin UI on localhost only (`--host 127.0.0.1`). It reads and writes credentials.
+
+---
+
 ## 3. Feeding context in
 
 There are five ways to put data into Context-Hub. Pick whichever matches the source.
