@@ -31,10 +31,27 @@ from fastapi import Depends, Header, HTTPException, status
 from context_hub.shared.types import Scope
 
 # Read once at import time.  None when unset or when not in development.
+# NOTE: read at import time, so a key written to .env after this module is
+# imported is picked up via the request-time fallback in _resolve_dev_api_key().
 _APP_ENV: str = os.environ.get("APP_ENV", "development")
 _DEV_API_KEY: str | None = (
     os.environ.get("DEV_API_KEY") if _APP_ENV == "development" else None
 )
+
+
+def _resolve_dev_api_key() -> str | None:
+    """Return the active development API key, or None.
+
+    Prefers the import-time module constant (this is what tests patch); falls
+    back to reading os.environ at call time so a DEV_API_KEY loaded into the
+    environment after import (e.g. `.env` loaded by ``context-hub serve``) is
+    still honored. Returns None outside development.
+    """
+    if _DEV_API_KEY is not None:
+        return _DEV_API_KEY
+    if os.environ.get("APP_ENV", "development") != "development":
+        return None
+    return os.environ.get("DEV_API_KEY")
 
 
 class AuthenticatedConsumer:
@@ -67,9 +84,13 @@ async def get_current_consumer(
         )
 
     # Development-only shortcut: accept DEV_API_KEY from the environment.
-    # _DEV_API_KEY is None when APP_ENV != "development" or when the variable
-    # is not set, so this branch is structurally unreachable in production.
-    if _DEV_API_KEY is not None and x_api_key == _DEV_API_KEY:
+    # The module-level constant is read at import time (and is what tests patch);
+    # we additionally fall back to reading os.environ at request time so a key
+    # written to .env and loaded after this module was imported (e.g. via
+    # `context-hub serve`) is still honored. Both paths are inert in production
+    # (APP_ENV != "development" → dev key resolves to None).
+    dev_api_key = _resolve_dev_api_key()
+    if dev_api_key is not None and x_api_key == dev_api_key:
         return AuthenticatedConsumer(
             consumer_id="dev",
             scopes=frozenset({Scope.READ, Scope.WRITE, Scope.ADMIN}),
