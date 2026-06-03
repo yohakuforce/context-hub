@@ -11,8 +11,11 @@ Strategy for async helper tests:
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
+import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -23,6 +26,23 @@ from typer.testing import CliRunner
 from context_hub.cli.main import app
 
 runner = CliRunner()
+
+
+@contextlib.contextmanager
+def isolated_fs() -> Iterator[str]:
+    """Run the body in a fresh temp dir as cwd, restoring cwd afterwards.
+
+    Replaces click's ``CliRunner.isolated_filesystem`` which typer 0.26 dropped
+    from ``typer.testing.CliRunner`` (it vendored click into ``typer._click``).
+    Stdlib-only, so it works regardless of the installed typer/click versions.
+    """
+    prev = os.getcwd()
+    with tempfile.TemporaryDirectory() as d:
+        os.chdir(d)
+        try:
+            yield d
+        finally:
+            os.chdir(prev)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -68,7 +88,7 @@ class TestInitCommand:
 
     def test_init_quickstart_creates_env_and_data_dir(self) -> None:
         """Happy path: init --profile quickstart writes .env and creates data/."""
-        with runner.isolated_filesystem():
+        with isolated_fs():
             result = runner.invoke(
                 app, ["init", "--profile", "quickstart"], catch_exceptions=False
             )
@@ -82,7 +102,7 @@ class TestInitCommand:
 
     def test_init_personal_profile(self) -> None:
         """init --profile personal should succeed."""
-        with runner.isolated_filesystem():
+        with isolated_fs():
             result = runner.invoke(
                 app, ["init", "--profile", "personal"], catch_exceptions=False
             )
@@ -91,7 +111,7 @@ class TestInitCommand:
 
     def test_init_production_profile(self) -> None:
         """init --profile production should succeed."""
-        with runner.isolated_filesystem():
+        with isolated_fs():
             result = runner.invoke(
                 app, ["init", "--profile", "production"], catch_exceptions=False
             )
@@ -100,21 +120,21 @@ class TestInitCommand:
 
     def test_init_unknown_profile_exits_nonzero(self) -> None:
         """init with an unrecognised profile must exit with code 1."""
-        with runner.isolated_filesystem():
+        with isolated_fs():
             result = runner.invoke(app, ["init", "--profile", "unknown"])
         assert result.exit_code == 1
         assert "unknown" in result.output
 
     def test_init_existing_env_without_force_exits_nonzero(self) -> None:
         """init should fail if .env already exists and --force is not given."""
-        with runner.isolated_filesystem():
+        with isolated_fs():
             Path(".env").write_text("# existing env\n")
             result = runner.invoke(app, ["init", "--profile", "quickstart"])
         assert result.exit_code == 1
 
     def test_init_force_flag_overwrites_existing_env(self) -> None:
         """init --force should succeed even when .env already exists."""
-        with runner.isolated_filesystem():
+        with isolated_fs():
             Path(".env").write_text("# existing env\n")
             result = runner.invoke(
                 app, ["init", "--profile", "quickstart", "--force"], catch_exceptions=False
@@ -124,7 +144,7 @@ class TestInitCommand:
 
     def test_init_env_content_matches_profile(self) -> None:
         """The generated .env should contain CH_PROFILE matching the chosen profile."""
-        with runner.isolated_filesystem():
+        with isolated_fs():
             runner.invoke(
                 app, ["init", "--profile", "quickstart"], catch_exceptions=False
             )
@@ -363,7 +383,7 @@ class TestRunQueryAsync:
     @pytest.mark.asyncio
     async def test_query_postgres_url_exits_nonzero(self) -> None:
         """_run_query should raise typer.Exit(1) for PostgreSQL URLs in v0.1."""
-        import click
+        import typer
 
         from context_hub.cli.main import _run_query
 
@@ -374,8 +394,8 @@ class TestRunQueryAsync:
         mock_profiles.get_profile_settings = MagicMock(return_value=settings_mock)
 
         with patch.dict(sys.modules, {"context_hub.config.profiles": mock_profiles}):
-            # typer.Exit wraps click.exceptions.Exit — catch the correct exception
-            with pytest.raises((click.exceptions.Exit, SystemExit)) as exc_info:
+            # typer.Exit wraps typer.Exit — catch the correct exception
+            with pytest.raises((typer.Exit, SystemExit)) as exc_info:
                 await _run_query(
                     text="test",
                     project_id=None,
@@ -386,7 +406,7 @@ class TestRunQueryAsync:
         # Either a click Exit with code 1 or a SystemExit with code 1
         code = (
             exc_info.value.exit_code
-            if isinstance(exc_info.value, click.exceptions.Exit)
+            if isinstance(exc_info.value, typer.Exit)
             else exc_info.value.code
         )
         assert code == 1
@@ -591,7 +611,7 @@ class TestInitChmod:
 
         This prevents other users on a shared system from reading credentials.
         """
-        with runner.isolated_filesystem():
+        with isolated_fs():
             result = runner.invoke(
                 app, ["init", "--profile", "quickstart"], catch_exceptions=False
             )
@@ -608,7 +628,7 @@ class TestInitChmod:
     @pytest.mark.skipif(sys.platform == "win32", reason="POSIX file permissions not applicable")
     def test_init_force_overwrites_and_resets_permissions(self) -> None:
         """init --force must reset permissions to 0600 even when .env already exists."""
-        with runner.isolated_filesystem():
+        with isolated_fs():
             # Create a .env with permissive permissions
             env_path = Path(".env")
             env_path.write_text("# old env\n")
@@ -711,7 +731,7 @@ class TestMigrateAdditionalPaths:
     @pytest.mark.asyncio
     async def test_postgres_migrate_nonzero_exit_raises(self) -> None:
         """_run_migrate with PostgreSQL URL raises typer.Exit when alembic fails."""
-        import click
+        import typer
 
         from context_hub.cli.main import _run_migrate
 
@@ -730,7 +750,7 @@ class TestMigrateAdditionalPaths:
         with patch.dict(sys.modules, {"context_hub.config.profiles": mock_profiles}), patch(
             "subprocess.run", return_value=mock_result
         ):
-            with pytest.raises((click.exceptions.Exit, SystemExit)):
+            with pytest.raises((typer.Exit, SystemExit)):
                 await _run_migrate(target="head", dry_run=False)
 
     def test_migrate_production_confirm_aborted(self) -> None:
@@ -767,7 +787,7 @@ class TestIngestAdditionalPaths:
     @pytest.mark.asyncio
     async def test_ingest_postgres_url_exits_nonzero(self) -> None:
         """_run_ingest should raise typer.Exit(1) for PostgreSQL URLs in v0.1."""
-        import click
+        import typer
 
         from context_hub.cli.main import _run_ingest
 
@@ -789,12 +809,12 @@ class TestIngestAdditionalPaths:
                 "context_hub.infrastructure.embedding.factory": mock_embedding_factory,
             },
         ):
-            with pytest.raises((click.exceptions.Exit, SystemExit)) as exc_info:
+            with pytest.raises((typer.Exit, SystemExit)) as exc_info:
                 await _run_ingest(source="slack", mode="mock", project_id=None)
 
         code = (
             exc_info.value.exit_code
-            if isinstance(exc_info.value, click.exceptions.Exit)
+            if isinstance(exc_info.value, typer.Exit)
             else exc_info.value.code
         )
         assert code == 1
@@ -802,7 +822,7 @@ class TestIngestAdditionalPaths:
     @pytest.mark.asyncio
     async def test_ingest_no_projects_exits_nonzero(self) -> None:
         """_run_ingest should exit 1 when no projects exist and project_id is None."""
-        import click
+        import typer
 
         from context_hub.cli.main import _run_ingest
 
@@ -837,12 +857,12 @@ class TestIngestAdditionalPaths:
                 "context_hub.application.ingestion_service": mock_ingest_module,
             },
         ):
-            with pytest.raises((click.exceptions.Exit, SystemExit)) as exc_info:
+            with pytest.raises((typer.Exit, SystemExit)) as exc_info:
                 await _run_ingest(source="slack", mode="mock", project_id=None)
 
         code = (
             exc_info.value.exit_code
-            if isinstance(exc_info.value, click.exceptions.Exit)
+            if isinstance(exc_info.value, typer.Exit)
             else exc_info.value.code
         )
         assert code == 1
@@ -972,7 +992,7 @@ class TestIngestAll:
     @pytest.mark.asyncio
     async def test_run_ingest_all_no_projects_exits_nonzero(self) -> None:
         """_run_ingest_all should exit 1 when no projects exist and project_id is None."""
-        import click
+        import typer
 
         from context_hub.cli.main import _run_ingest_all
 
@@ -983,7 +1003,7 @@ class TestIngestAll:
         mock_config_module.settings = MagicMock(ch_inbox_dir=None)
 
         with patch.dict(sys.modules, {"context_hub.config": mock_config_module}):
-            with pytest.raises((click.exceptions.Exit, SystemExit)) as exc_info:
+            with pytest.raises((typer.Exit, SystemExit)) as exc_info:
                 await _run_ingest_all(
                     mode="mock",
                     project_id=None,
@@ -997,7 +1017,7 @@ class TestIngestAll:
 
         code = (
             exc_info.value.exit_code
-            if isinstance(exc_info.value, click.exceptions.Exit)
+            if isinstance(exc_info.value, typer.Exit)
             else exc_info.value.code
         )
         assert code == 1
@@ -1078,7 +1098,7 @@ class TestQueryAdditionalPaths:
     @pytest.mark.asyncio
     async def test_query_no_projects_exits_nonzero(self) -> None:
         """_run_query should exit 1 when no projects exist and project_id is None."""
-        import click
+        import typer
 
         from context_hub.cli.main import _run_query
 
@@ -1108,7 +1128,7 @@ class TestQueryAdditionalPaths:
                 "context_hub.adapters.sqlite.document_repository": mock_doc_repo_module,
             },
         ):
-            with pytest.raises((click.exceptions.Exit, SystemExit)) as exc_info:
+            with pytest.raises((typer.Exit, SystemExit)) as exc_info:
                 await _run_query(
                     text="test",
                     project_id=None,
@@ -1118,7 +1138,7 @@ class TestQueryAdditionalPaths:
 
         code = (
             exc_info.value.exit_code
-            if isinstance(exc_info.value, click.exceptions.Exit)
+            if isinstance(exc_info.value, typer.Exit)
             else exc_info.value.code
         )
         assert code == 1
@@ -1129,7 +1149,7 @@ class TestInitEnvSrcNotFound:
 
     def test_init_env_src_not_found_exits_nonzero(self) -> None:
         """init should exit 1 if the env example source file does not exist."""
-        with runner.isolated_filesystem():
+        with isolated_fs():
             # Patch _ENV_EXAMPLE_BASE to a non-existent directory
             with patch("context_hub.cli.main._ENV_EXAMPLE_BASE", Path("/nonexistent/path")):
                 result = runner.invoke(app, ["init", "--profile", "quickstart"])
