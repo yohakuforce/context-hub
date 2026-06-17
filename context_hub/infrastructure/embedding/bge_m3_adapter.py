@@ -15,6 +15,8 @@ BGE-M3 output:
 
 Performance (CPU, Windows PC):
   ~50-150ms per text (500 tokens), ~30ms per text in batches of 12.
+  fp16 is disabled on CPU (see __init__) — half precision has no CPU kernel
+  and would run slower than fp32.
 
 Reference: https://huggingface.co/BAAI/bge-m3
 """
@@ -48,14 +50,28 @@ class BGEM3EmbeddingAdapter:
         device: str | None = None,
         batch_size: int = _DEFAULT_BATCH_SIZE,
         max_length: int = _DEFAULT_MAX_LENGTH,
-        use_fp16: bool = True,
+        use_fp16: bool | None = None,
     ) -> None:
         # Device: "cpu" or "cuda". Falls back to env var EMBEDDING_DEVICE.
         self._device = device or os.environ.get("EMBEDDING_DEVICE", "cpu")
         self._batch_size = batch_size
         self._max_length = max_length
-        self._use_fp16 = use_fp16
+        # fp16 (half precision) only accelerates CUDA. On CPU — the common case
+        # on Windows boxes without a GPU — most PyTorch ops have no fp16 kernel,
+        # so half precision is silently emulated and ends up *slower* (and noisy
+        # with warnings). Default it on only for CUDA; allow an explicit override
+        # via the constructor arg or the EMBEDDING_USE_FP16 env var.
+        self._use_fp16 = self._resolve_use_fp16(use_fp16, self._device)
         self._model: Any = None  # lazy-loaded
+
+    @staticmethod
+    def _resolve_use_fp16(use_fp16: bool | None, device: str) -> bool:
+        if use_fp16 is not None:
+            return use_fp16
+        env = os.environ.get("EMBEDDING_USE_FP16")
+        if env is not None:
+            return env.strip().lower() in {"1", "true", "yes", "on"}
+        return device.lower() == "cuda"
 
     def _load_model(self) -> Any:
         """Load BGE-M3 model synchronously (called from thread pool)."""

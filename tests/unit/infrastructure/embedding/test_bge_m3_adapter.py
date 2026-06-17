@@ -94,3 +94,22 @@ class TestBGEM3EmbeddingAdapter:
             adapter._encode_sync(["hello"])
 
         mock_load.assert_called_once()
+
+    def test_fp16_disabled_on_cpu_by_default(self) -> None:
+        """fp16 has no CPU kernel — must default off on the GPU-less Windows path."""
+        adapter = BGEM3EmbeddingAdapter(device="cpu")
+        assert adapter._use_fp16 is False
+
+    def test_fp16_enabled_on_cuda_by_default(self) -> None:
+        adapter = BGEM3EmbeddingAdapter(device="cuda")
+        assert adapter._use_fp16 is True
+
+    def test_explicit_use_fp16_overrides_device_default(self) -> None:
+        assert BGEM3EmbeddingAdapter(device="cpu", use_fp16=True)._use_fp16 is True
+        assert BGEM3EmbeddingAdapter(device="cuda", use_fp16=False)._use_fp16 is False
+
+    def test_env_var_overrides_cpu_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("EMBEDDING_USE_FP16", "true")
+        assert BGEM3EmbeddingAdapter(device="cpu")._use_fp16 is True
+        monkeypatch.setenv("EMBEDDING_USE_FP16", "off")
+        assert BGEM3EmbeddingAdapter(device="cuda")._use_fp16 is False

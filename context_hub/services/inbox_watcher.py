@@ -1,7 +1,9 @@
 """Inbox folder watcher — auto-ingest .md/.txt files dropped into a local folder.
 
-Watches ``<inbox_dir>/{meeting,file,email}/`` on a polling interval (default 60s).
-Each file is treated as one Document.
+Watches ``<inbox_dir>/{doc,meeting,file,email}/`` on a polling interval (default 60s).
+Each file is treated as one Document. ``doc/`` is scanned first (see
+``_SUBDIR_TO_SOURCE``) so high-value synthesized/converted markdown embeds ahead
+of the raw long tail.
 
 Idempotency
 -----------
@@ -28,6 +30,9 @@ Accepted layout
 ::
 
     <ch_inbox_dir>/
+        doc/
+            synthesized-glossary.md
+            from-pptx/deck.md
         meeting/
             2026-05-20-weekly.md
             sub/nested-also-ok.md
@@ -55,8 +60,19 @@ from context_hub.shared.types import ProjectId, RawContent, SourceType
 
 logger = logging.getLogger(__name__)
 
-# Sub-directory name → SourceType
+# Sub-directory name → SourceType.
+#
+# Order matters: directories are scanned top-to-bottom and embedded in that
+# order. ``doc`` is listed first so high-value synthesized knowledge and
+# converted PPT/Excel markdown get embedded before the long tail of raw files
+# — this keeps the most useful documents searchable first on slow CPU-only
+# (e.g. GPU-less Windows) embedding boxes where a full pass takes a long time.
+#
+# ``doc`` maps to SourceType.FILE: the external_id is prefixed with the subdir
+# (``doc/<rel>`` vs ``file/<rel>``), so the two never collide on the
+# (project_id, source_type, external_id) upsert key.
 _SUBDIR_TO_SOURCE: dict[str, SourceType] = {
+    "doc": SourceType.FILE,
     "meeting": SourceType.MEETING,
     "file": SourceType.FILE,
     "email": SourceType.EMAIL,

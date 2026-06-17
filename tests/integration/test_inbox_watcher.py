@@ -127,6 +127,25 @@ class TestInboxScanRoutingAndFilters:
             ) is not None
 
     @pytest.mark.asyncio
+    async def test_doc_subdir_ingested_as_file_and_scanned_first(self, inbox, deps):
+        """doc/ holds synthesized/converted markdown — ingested as FILE, embedded
+        before the raw long tail so high-value docs surface first on slow CPUs."""
+        project_repo, doc_repo, embedding = deps
+        await project_repo.save(_make_project())
+        (inbox / "doc").mkdir(parents=True)
+        (inbox / "doc" / "glossary.md").write_text("# Glossary\n\nterms", encoding="utf-8")
+        (inbox / "file" / "f.md").write_text("f", encoding="utf-8")
+
+        result = await scan_inbox(inbox, project_repo, doc_repo, embedding)
+
+        # doc/ routes to SourceType.FILE under its own external_id namespace.
+        assert await doc_repo.find_by_external_id(
+            ProjectId("proj-inbox"), SourceType.FILE, "doc/glossary.md"
+        ) is not None
+        # doc/ is scanned before file/ (priority ordering).
+        assert result.ingested.index("doc/glossary.md") < result.ingested.index("file/f.md")
+
+    @pytest.mark.asyncio
     async def test_ignores_unsupported_extensions(self, inbox, deps):
         project_repo, doc_repo, embedding = deps
         await project_repo.save(_make_project())
