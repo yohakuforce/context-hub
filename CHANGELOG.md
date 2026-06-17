@@ -13,6 +13,19 @@ _No unreleased changes yet._
 
 ---
 
+## [0.3.1] - 2026-06-17
+
+### Fixed
+
+- **Admin GUI auth via `.env`** — the documented `init → serve → /admin` flow left every GUI data call `401`: the auth middleware read `DEV_API_KEY` from the environment at import time, but `init` only wrote it to `.env`. `serve` now loads the cwd `.env` into the process env before the app/auth import, and the auth middleware falls back to reading `os.environ` at request time, so a key loaded after import is still honored.
+- **fp16 default is now device-aware** — half precision has no CPU kernel, so on the common GPU-less (e.g. Windows) box it was silently emulated, running *slower* and emitting warnings. `BGEM3EmbeddingAdapter` now defaults `use_fp16` on only for CUDA; override with the constructor arg or the `EMBEDDING_USE_FP16` env var.
+
+### Added
+
+- **Inbox `doc/` priority subdir** — the inbox watcher now also scans `<inbox_dir>/doc/`, listed *first* so high-value synthesized / converted (PPT/Excel→markdown) documents embed ahead of the raw long tail on slow CPU-only embedding boxes. `doc/` maps to `SourceType.FILE` with a `doc/<rel>` external-id prefix, so it never collides with `file/` on the upsert key.
+
+---
+
 ## [0.3.0] - 2026-06-03
 
 ### Added — Admin GUI & serve-resident automation
